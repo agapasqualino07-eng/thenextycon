@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 — Web app per iPhone (non ancora pubblicata)
+### Aggiunto
+- `Web/OfficinaTycoon.Web`: web app installabile (PWA, Blazor WebAssembly) che usa la stessa logica di `Assets/Scripts/Core`; interfaccia mobile completa (macchine, upgrade e revisioni, ordini, eventi, cassa, impostazioni), popup offline, istruzioni "Aggiungi alla schermata Home", funzionamento offline (service worker), salvataggio in `localStorage`, **backup/ripristino** con codice validato, Content-Security-Policy, nessuna pubblicità né raccolta dati.
+- `KeyValueSaveStorage`, `SaveManager.Encode/TryDecode` (import sicuro), limiti di dimensione nel parser JSON, conversioni numeriche saturanti.
+- 40 nuovi test unitari (sicurezza/storage, testi e formattazione) e 10 test end-to-end in browser (Playwright, viewport iPhone).
+- CI GitHub Actions: test + build + e2e a ogni push, pubblicazione su GitHub Pages da `main`.
+- Documenti `Docs/INSTALL_IPHONE.md`, `Docs/SECURITY.md`.
+### Corretto
+- Formattazione numeri: `999.999.999` mostrava "1000M" (ora "999M", senza arrotondare per eccesso il saldo).
+- Testi con apostrofi al posto delle lettere accentate.
+
 ## 0.1.0-prototype (non rilasciato)
 Prima versione sviluppata da un repository vuoto.
 

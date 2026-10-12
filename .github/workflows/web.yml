@@ -1,0 +1,98 @@
+# Builds, tests and publishes the installable web app (PWA) of Officina Tycoon.
+#  - every push / pull request: unit tests (.NET), release + dev publish, browser end-to-end tests (Chromium, iPhone viewport)
+#  - push to main (or manual run on main): deploys the release build to GitHub Pages
+# Security: no secrets are used; default token is read-only; Pages permissions only in the deploy job;
+# pull_request (not pull_request_target) so forks never get write access.
+name: Web app
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Unit tests (game logic, saves, events, ads flow, security)
+        run: dotnet test Tools/Tests.Dotnet -c Release
+
+      - name: Publish web app (release)
+        run: dotnet publish Web/OfficinaTycoon.Web -c Release -o out/release
+
+      - name: Publish web app (dev tools, used only by tests)
+        run: dotnet publish Web/OfficinaTycoon.Web -c Release -p:OfficinaDevTools=true -o out/dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install browser test tools (pinned by package-lock.json)
+        working-directory: Web/e2e
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Browser end-to-end tests
+        working-directory: Web/e2e
+        env:
+          RELEASE_DIR: ${{ github.workspace }}/out/release/wwwroot
+          DEV_DIR: ${{ github.workspace }}/out/dev/wwwroot
+          SCREENSHOT_DIR: ${{ github.workspace }}/screenshots
+        run: |
+          mkdir -p "$SCREENSHOT_DIR"
+          node --test --test-concurrency=1 game.e2e.cjs
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots
+          if-no-files-found: ignore
+
+      - name: Upload web app (zip, for manual hosting e.g. any static host)
+        uses: actions/upload-artifact@v4
+        with:
+          name: officina-tycoon-web
+          path: out/release/wwwroot
+
+      - name: Prepare GitHub Pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: touch out/release/wwwroot/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          path: out/release/wwwroot
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build-test
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

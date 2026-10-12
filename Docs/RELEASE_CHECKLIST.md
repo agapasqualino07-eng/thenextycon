@@ -2,6 +2,12 @@
 
 Legenda: `[ ]` da fare · nessuna voce è stata eseguita in questo repository.
 
+## 0. Web app (iPhone) — percorso più rapido
+- [ ] Scegliere l'hosting (Docs/INSTALL_IPHONE.md §1) e abilitare Pages con sorgente "GitHub Actions" se si usa GitHub Pages.
+- [ ] Unire il branch in `main` e verificare che il workflow *Web app* sia verde.
+- [ ] Su un **iPhone reale** con Safari: apertura, "Aggiungi alla schermata Home", avvio dall'icona, gioco offline (modalità aereo), chiusura/riapertura con progressi mantenuti, popup offline dopo qualche ora, backup e ripristino, suoni, rotazione, area sicura (notch/Dynamic Island).
+- [ ] Verificare l'aggiornamento: pubblicare una modifica, riaprire l'app due volte, controllare la versione in *Altro*.
+
 ## 1. Primo avvio in Unity (blocca tutto il resto)
 - [ ] Aprire il progetto con Unity 6 LTS (6000.0.x); lasciare importare i pacchetti.
 - [ ] **Correggere gli errori di compilazione** di `Assets/Scripts/Unity` e `Assets/Editor` (mai compilati in Unity). Annotarli in CHANGELOG.

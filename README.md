@@ -1,13 +1,26 @@
 # Officina Tycoon
 
-Gioco mobile idle/tycoon 2D (Unity + C#) ambientato nella produzione industriale: si parte da una piccola officina, si
+Gioco mobile idle/tycoon 2D ambientato nella produzione industriale: si parte da una piccola officina, si
 comprano e potenziano macchinari, si completano ordini e si reinveste. Offline-first, nessun backend, nessun acquisto in-app.
 
-> **Stato onesto (leggere prima di tutto).** La **logica di gioco** (economia, produzione, ordini, eventi di rischio/ricompensa,
+## 📱 Giocare su iPhone (web app installabile) — **pronta e testata**
+La cartella `Web/` contiene la versione **installabile su iPhone** (PWA): la **stessa logica C#** del gioco compilata in WebAssembly,
+con interfaccia mobile, salvataggio sul dispositivo, backup/ripristino e funzionamento offline.
+Istruzioni complete: **[Docs/INSTALL_IPHONE.md](Docs/INSTALL_IPHONE.md)** (pubblicazione con GitHub Pages + "Aggiungi alla schermata Home").
+Verifiche eseguite: 217 test unitari + **10 test end-to-end in un browser reale** (Chromium con schermo e tocco da iPhone) a ogni push via GitHub Actions.
+Sicurezza: [Docs/SECURITY.md](Docs/SECURITY.md).
+
+```
+dotnet publish Web/OfficinaTycoon.Web -c Release -o out/release      # sito statico in out/release/wwwroot
+cd Web/e2e && npm ci && npx playwright install chromium && \
+  RELEASE_DIR=../../out/release/wwwroot node --test --test-concurrency=1 game.e2e.cjs
+```
+
+> **Stato onesto del progetto Unity (leggere prima di tutto).** La **logica di gioco** (economia, produzione, ordini, eventi di rischio/ricompensa,
 > cassa gratuita, guadagni offline, salvataggi, flusso rewarded ad, analytics) è completa, **testata con 177 test
-> automatici che passano** e simulata. Il **livello Unity** (UI, audio, bootstrap, scena, strumenti Editor, adattatore AdMob)
+> automatici che passano** e simulata (gli stessi sorgenti alimentano la web app, verificata nel browser). Il **livello Unity** (UI, audio, bootstrap, scena, strumenti Editor, adattatore AdMob)
 > è scritto ma **non è mai stato aperto né compilato in Unity**: durante lo sviluppo non era disponibile l'Unity Editor.
-> Per questo il progetto **NON è dichiarato pronto per un test interno**. Cosa manca è elencato in
+> Per questo la versione **Unity** **NON è dichiarata pronta per un test interno** (la web app sì, vedi sopra). Cosa manca è elencato in
 > [Stato dei criteri di accettazione](#stato-dei-criteri-di-accettazione) e in [Docs/TEST_REPORT.md](Docs/TEST_REPORT.md).
 
 ## Requisiti
@@ -24,7 +37,7 @@ comprano e potenziano macchinari, si completano ordini e si reinveste. Offline-f
 ## Come eseguire i test e gli strumenti
 | Cosa | Comando / azione | Note |
 |---|---|---|
-| Test logica (177) | `dotnet test Tools/Tests.Dotnet` | Compila gli **stessi** sorgenti di `Assets/Scripts/Core` e gli **stessi** test di `Assets/Tests/EditMode`. Risultato verificato. |
+| Test logica (217) | `dotnet test Tools/Tests.Dotnet` | Compila gli **stessi** sorgenti di `Assets/Scripts/Core` e gli **stessi** test di `Assets/Tests/EditMode`. Risultato verificato. |
 | Test in Unity | Window → General → Test Runner → EditMode → Run All | **Non eseguito** (nessun Editor disponibile). |
 | Simulatore economia | `dotnet run --project Tools/Simulator -c Release -- 30` | Usa `GameSession` reale. Output in [Docs/ECONOMY_BALANCE.md](Docs/ECONOMY_BALANCE.md). |
 | Controllo compilazione parziale Unity | `dotnet build Tools/UnityCompileCheck` | Vedi limiti sotto. |
@@ -52,9 +65,13 @@ Assets/Tests/EditMode/      Test NUnit
 Tools/Tests.Dotnet/         Esegue Core + test con `dotnet test`
 Tools/Simulator/            Simulatore di bilanciamento
 Tools/UnityCompileCheck/    Controllo di compilazione parziale (vedi limiti)
+Tools/SharedTextTests/      Test di testi e formattazione condivisi
+Web/OfficinaTycoon.Web/     Web app installabile (Blazor WebAssembly, PWA) per iPhone/Android/desktop
+Web/e2e/                    Test end-to-end nel browser (Playwright)
+.github/workflows/web.yml   CI: test, build, test nel browser, pubblicazione su GitHub Pages (solo main)
 Docs/                       Documentazione
 ```
-Documenti: [ARCHITECTURE](Docs/ARCHITECTURE.md) · [GAME_DESIGN](Docs/GAME_DESIGN.md) · [ECONOMY_BALANCE](Docs/ECONOMY_BALANCE.md) · [MONETIZATION](Docs/MONETIZATION.md) · [ANALYTICS](Docs/ANALYTICS.md) · [PRIVACY_AND_POLICY_CHECKLIST](Docs/PRIVACY_AND_POLICY_CHECKLIST.md) · [TEST_REPORT](Docs/TEST_REPORT.md) · [RELEASE_CHECKLIST](Docs/RELEASE_CHECKLIST.md) · [ASSETS_TO_REPLACE](Docs/ASSETS_TO_REPLACE.md) · [CHANGELOG](CHANGELOG.md)
+Documenti: [INSTALL_IPHONE](Docs/INSTALL_IPHONE.md) · [SECURITY](Docs/SECURITY.md) · [ARCHITECTURE](Docs/ARCHITECTURE.md) · [GAME_DESIGN](Docs/GAME_DESIGN.md) · [ECONOMY_BALANCE](Docs/ECONOMY_BALANCE.md) · [MONETIZATION](Docs/MONETIZATION.md) · [ANALYTICS](Docs/ANALYTICS.md) · [PRIVACY_AND_POLICY_CHECKLIST](Docs/PRIVACY_AND_POLICY_CHECKLIST.md) · [TEST_REPORT](Docs/TEST_REPORT.md) · [RELEASE_CHECKLIST](Docs/RELEASE_CHECKLIST.md) · [ASSETS_TO_REPLACE](Docs/ASSETS_TO_REPLACE.md) · [CHANGELOG](CHANGELOG.md)
 
 ## Cosa è completo / simulato / incompleto
 | Area | Stato |
@@ -90,7 +107,7 @@ Documenti: [ARCHITECTURE](Docs/ARCHITECTURE.md) · [GAME_DESIGN](Docs/GAME_DESIG
 | 11 | Rewarded robusto o mock identificato | Mock testato; rete reale assente |
 | 12 | Ricompensa base indipendente dall'annuncio | Testato |
 | 13 | Niente duplicazione ricompense | Testato per le sequenze previste (limite: salvataggio locale non è inviolabile) |
-| 14 | Test automatici passano | **177/177 con dotnet**; Unity Test Runner non eseguito |
+| 14 | Test automatici passano | **217/217 con dotnet** + 10/10 e2e web; Unity Test Runner non eseguito |
 | 15 | Build verificata | **No** |
 | 16 | Configurazioni e dipendenze documentate | Sì |
 | 17 | Checklist di pubblicazione | Sì |

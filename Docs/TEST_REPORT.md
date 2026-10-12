@@ -2,11 +2,27 @@
 
 Ambiente: container Linux, .NET SDK 8.0.131 (apt), NUnit 3.14, Microsoft.NET.Test.Sdk 17.11.1, C# LangVersion 9 (come Unity 6). **Unity Editor non disponibile.**
 
-## Risultato eseguito
+## Risultato eseguito (aggiornato alla 0.2.0)
 ```
-$ dotnet test Tools/Tests.Dotnet
-Passed!  - Failed: 0, Passed: 177, Skipped: 0, Total: 177, Duration: ~1 s
+$ dotnet test Tools/Tests.Dotnet -c Release
+Passed!  - Failed: 0, Passed: 217, Skipped: 0, Total: 217, Duration: ~1 s
+
+$ node --test --test-concurrency=1 Web/e2e/game.e2e.cjs     (Chromium 141, viewport 390x844, touch, UA iPhone)
+ok 1 - release: boots on an iPhone viewport with no errors, CSP violations or third-party requests
+ok 2 - release: first minute — tap, claim tutorial, buy the first machine, production starts
+ok 3 - release: progress survives a reload (saved in the browser)
+ok 4 - release: every tab renders, nothing overflows horizontally, no button text is cut
+ok 5 - release: no simulated ads and no dev tools in the public build, even with ?dev=1
+ok 6 - release: backup export -> reset -> import restores progress; invalid code is rejected
+ok 7 - release: installable PWA — manifest, icons and offline start via service worker
+ok 8 - dev: offline earnings popup, simulated rewarded ad grants the declared bonus once
+ok 9 - dev: experimental machine shows odds before paying, needs confirmation, pays once
+ok 10 - dev: surge and free crate work and show their odds
+# tests 10 · pass 10 · fail 0
 ```
+I test end-to-end girano sui file **pubblicati**, serviti sotto il sottopercorso `/thenextycon/` come su GitHub Pages.
+Aggiunti in 0.2.0: `SecurityAndStorageTests` (import non fidato, codici manomessi/troppo grandi/di versione futura, valori estremi, parser con input casuale, mapper che non istanzia tipi arbitrari, storage chiave-valore con backup) e `TextAndFormatTests` (formattazione numeri/tempi, testi con segnaposto, chiavi di testo usate dal codice tutte presenti).
+Difetti trovati in 0.2.0 dai test e corretti: arrotondamento "1000M"; accenti come apostrofi; il popup "Aggiungi alla schermata Home" (comportamento voluto) copriva i comandi: ora è verificato e chiuso dai test.
 I test sono in `Assets/Tests/EditMode` e si compilano **senza modifiche** sia nel progetto .NET sia nell'Unity Test Framework (asmdef Editor-only con `nunit.framework.dll`). La corsa in Unity **non è stata eseguita**.
 
 ## Copertura rispetto alla specifica §13
@@ -28,7 +44,8 @@ I test sono in `Assets/Tests/EditMode` e si compilano **senza modifiche** sia ne
 - **Compilazione del livello Unity in Unity** (UI, bootstrap, audio, Editor, AdMob). `Tools/UnityCompileCheck` dà 0 errori ma con API core 2021.3 da NuGet e **stub scritti a mano** per uGUI: controllo parziale.
 - Prestazioni reali, avvio su dispositivo, cambio schermata, pausa/background reali, risoluzioni diverse, ricerca di riferimenti a oggetti distrutti, pulsanti inattivi. Sono **verifiche manuali** (RELEASE_CHECKLIST §2).
 - Build Android/iOS; SDK pubblicitario; flusso di consenso reale.
-- Nessun test automatico sulla UI.
+- Nessun test automatico sulla UI **Unity** (la UI web è coperta dai test e2e).
+- I test e2e usano Chromium, **non WebKit/Safari reale**: provare su un iPhone fisico prima di diffondere il link.
 
 ## Difetti trovati dai test/simulatore durante lo sviluppo (tutti corretti)
 1. Economia iniziale sbilanciata (tutto sbloccato in ~10 min) — trovato dal simulatore; ridisegnata (vedi ECONOMY_BALANCE).
