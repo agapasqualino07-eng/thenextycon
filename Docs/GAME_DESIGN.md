@@ -57,6 +57,12 @@ Vedi [MONETIZATION](MONETIZATION.md).
 - **Obiettivo in vista**: l'ordine più vicino al completamento è sempre mostrato sotto la fabbrica e si riscuote con un tocco.
 - **Accessibilità**: impostazione "Effetti visivi: ridotti" e rispetto dell'opzione di sistema "riduci movimento".
 
+## Social e premi (0.4.0)
+- **Inviti**: ogni giocatore ha un codice casuale (nessun dato personale). Link `…/thenextycon/?ref=CODICE`: il nuovo giocatore riceve 500 Cr (o 5 min di produzione se maggiore) + 1 cassa, una volta per dispositivo. Chi condivide il link riceve 1 cassa una volta al giorno. Codici con alfabeto ristretto (niente 0/O/1/I), validati rigidamente.
+- **Video premiati**: cassa gratis (max 3/giorno), ordine x2, acceleratore x2 5 min, regalo giornaliero x2, bonus offline +50%. Tutti facoltativi; premio solo a video completato; limite globale 12/giorno.
+- **Stile**: cartoon, mascotte "Bullo". Attenzione: uno stile che attrae bambini fa scattare regole più severe sugli annunci (vedi PRIVACY_AND_POLICY_CHECKLIST).
+- **Esclusi di proposito**: slot machine/ruote (azzardo simulato), attacchi/furti ai villaggi degli amici e premi a invito verificato (richiedono server).
+
 ## Non implementato (dichiarato)
 - **Specializzazioni** della fase avanzata (previste dal brief): oggi la fase avanzata ha solo macchine costose e sinergie.
 - **Prestigio/reset**: l'economia continua a crescere ma il contenuto finisce dopo ~30 giorni (vedi [ECONOMY_BALANCE](ECONOMY_BALANCE.md)).

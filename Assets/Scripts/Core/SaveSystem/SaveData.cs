@@ -26,6 +26,7 @@ namespace OfficinaTycoon
         public OfflineSave Offline = new OfflineSave();
         public AdSave Ads = new AdSave();
         public DailySave Daily = new DailySave();
+        public SocialSave Social = new SocialSave();
         public List<string> Claimed = new List<string>();
         public SettingsSave Settings = new SettingsSave();
         public StatsSave Stats = new StatsSave();
@@ -113,6 +114,19 @@ namespace OfficinaTycoon
         public int CountToday = 0;
         public long LastAdTicks = 0;
         public int BoostSeq = 0;
+        public string CrateAdDay = "";
+        public int CrateAdCount = 0;
+        public int CrateAdSeq = 0;
+    }
+
+    [Serializable]
+    public class SocialSave
+    {
+        public string Code = "";
+        public bool ReferralApplied = false;
+        public string ReferredBy = "";
+        public int LastShareDay = -1;
+        public int Shares = 0;
     }
 
     [Serializable]

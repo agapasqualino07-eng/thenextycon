@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0 — Stile cartoon, premi e inviti
+### Aggiunto
+- **Stile cartoon**: colori vivaci, contorni spessi, caratteri arrotondati, pulsanti 3D "gommosi", moneta d'oro, cieli diversi per fase, contorni sui disegni dei macchinari.
+- **Bullo**, la mascotte robot: saluta, commenta acquisti e Frenesia, dà consigli (toccalo per il prossimo).
+- **Scheda Premi**: regalo giornaliero, video premiati, inviti.
+- **Guarda un video per…** (solo con rete pubblicitaria o nella demo): cassa gratis (3 al giorno), ricompensa ordine x2, oltre ad acceleratore, regalo x2 e bonus offline.
+- **Invita un amico**: codice personale di 6 caratteri e link `?ref=CODICE`; chi entra dal link riceve un regalo di benvenuto (una volta per dispositivo); chi condivide riceve una cassa (una volta al giorno). Inserimento manuale del codice di un amico.
+- **Demo pubblica** in `/demo/` con video simulati e strumenti di sviluppo, salvataggio separato, etichetta DEMO.
+- 20 test unitari (252) e 6 test nel browser (22), incluso un test di compatibilità con i salvataggi della versione precedente.
+### Modificato
+- Annunci: massimo 12 al giorno, almeno 60 s tra uno e l'altro.
+### Non fatto (deliberatamente)
+- Nessuna slot machine o ruota: meccaniche di azzardo simulato, a rischio policy e legali, specie con uno stile che attrae bambini.
+- Nessun premio "quando l'amico inizia a giocare": serve un server per verificarlo.
+
 ## 0.3.0 — Grafica e coinvolgimento
 ### Aggiunto
 - Fabbrica 2D animata con illustrazioni di tutti gli 8 macchinari (animazioni più veloci al crescere del livello), nastro trasportatore con i prodotti, sfondo che cambia per fase; illustrazioni anche nelle liste e nella festa di nuova fase.

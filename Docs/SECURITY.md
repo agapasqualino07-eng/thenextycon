@@ -18,6 +18,11 @@ Revisione mirata dell'intero branch (logica C#, front-end Unity, web app, servic
 - **Segreti**: nessuno nel repository; gli ID pubblicitari di produzione sono vuoti di proposito; `*.keystore`/`*.jks` in `.gitignore`.
 - **CI**: token in sola lettura, permessi Pages solo nel job di deploy e solo da `main`, `pull_request` (non `pull_request_target`), `persist-credentials: false`, dipendenze npm bloccate da `package-lock.json` con hash di integrità.
 
+## Aggiunte 0.4.0
+- Il parametro `?ref=` dell'URL è input non fidato: accettato solo se è un codice di 6 caratteri dell'alfabeto previsto, mai inserito come HTML, rimosso dalla barra degli indirizzi dopo la lettura (test e2e con un tentativo di iniezione HTML).
+- La demo pubblica ha un salvataggio separato (`officina-demo.`) e il service worker del gioco non risponde mai per `/demo/`: i trucchi della demo non possono toccare i progressi veri.
+- Il premio di condivisione è limitato a una volta al giorno con orologio "solo in avanti" e ledger anti-duplicazione.
+
 ## Rinforzi applicati durante la revisione
 - Limite di dimensione nel parser JSON e nella decodifica dei salvataggi.
 - Conversione numerica saturante (niente overflow con valori enormi in un salvataggio manipolato).

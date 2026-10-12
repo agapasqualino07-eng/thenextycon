@@ -15,6 +15,8 @@ Esiste l'architettura completa e un mock; **nessuna rete pubblicitaria reale è 
 | `offline_bonus` | + `AdBonusFraction` × ricompensa offline | 1 per offerta |
 | `production_boost` | ×2 produzione per 300 s | non richiedibile se resta più di 30 s di acceleratore da video |
 | `daily_bonus` | regalo giornaliero raddoppiato | 1 per regalo |
+| `free_crate` | 1 cassa gratuita | max `CrateAdsPerDay` (3) al giorno, non se il magazzino casse è pieno |
+| `order_double` | ricompensa in Cr dell'ordine x2 | 1 per ordine; se il video fallisce l'ordine resta riscuotibile normalmente |
 Globali: min 120 s tra due annunci, max 8 al giorno, timeout 120 s. Tutto modificabile in `AdsConfig`.
 
 ## Flusso e robustezza (testati con mock)

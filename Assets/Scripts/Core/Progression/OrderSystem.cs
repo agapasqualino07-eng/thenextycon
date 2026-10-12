@@ -63,6 +63,7 @@ namespace OfficinaTycoon
         public OrderView Get(string id) => _states.TryGetValue(id, out var s) ? ToView(s) : null;
 
         public int ClaimableCount => _states.Values.Count(s => s.Status == OrderStatus.Completed);
+        public bool IsCompleted(string id) => _states.TryGetValue(id, out var s) && s.Status == OrderStatus.Completed;
 
         OrderView ToView(OrderStateSave s)
         {
@@ -170,12 +171,15 @@ namespace OfficinaTycoon
 
         // ---------------------------------------------------------------- claim
         /// <summary>Pays the order reward exactly once.</summary>
-        public bool TryClaim(string id)
+        public bool TryClaim(string id) => TryClaim(id, 1.0);
+
+        /// <summary>Pays the order reward exactly once; currencyMultiplier &gt; 1 only after a confirmed rewarded ad.</summary>
+        public bool TryClaim(string id, double currencyMultiplier)
         {
             if (!_states.TryGetValue(id, out var s) || s.Status != OrderStatus.Completed) return false;
             if (!_ledger.TryClaim("order:" + id)) { s.Status = OrderStatus.Claimed; return false; }
             var d = _defs[id];
-            _wallet.Add(RewardFor(d), "order:" + id);
+            _wallet.Add(RewardFor(d) * Math.Max(1, Num.Sanitize(currencyMultiplier, 1)), "order:" + id);
             if (d.RewardParts > 0) _production.AddParts(d.RewardParts);
             if (d.RewardCrates > 0) GrantCrates(d.RewardCrates, "order:" + id);
             s.Status = OrderStatus.Claimed;

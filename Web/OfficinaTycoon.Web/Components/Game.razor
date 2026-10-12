@@ -10,7 +10,7 @@ else
 {
 <div class="app @(S.Frenzy.Active ? "in-frenzy" : "")">
     <header class="topbar">
-        <div class="balance" data-test="balance">@Fmt.Cr(_shownBalance)</div>
+        <div class="balance" data-test="balance"><span class="coin" aria-hidden="true"></span>@Fmt.Cr(_shownBalance)</div>
         <div class="ops" data-test="ops">@Loc.T("top.ops", Fmt.Num(S.Production.OutputPerSecond))</div>
         <div class="phase">@Loc.T("top.phase", S.Progression.Phase.Name)</div>
         <div class="top-right">
@@ -26,7 +26,10 @@ else
         <div class="bar"><div class="fill steel" style="width:@Pct(S.Progression.NextPhaseProgress)"></div></div>
     </header>
 
-    <FactoryScene S="S" Colors="MachineColors" PopId="@(DateTime.UtcNow < _popUntil ? _popId : null)" OnBayClick="OnBayClick" />
+    <div class="scene-wrap">
+        <FactoryScene S="S" Colors="MachineColors" PopId="@(DateTime.UtcNow < _popUntil ? _popId : null)" OnBayClick="OnBayClick" />
+        <Mascot Say="@(DateTime.UtcNow < _sayUntil ? _say : null)" OnTap="NextTip" />
+    </div>
 
     @GoalChip()
 
@@ -68,10 +71,14 @@ else
         @NavButton(Tab.Factory, "nav.factory", HasFactoryDot())
         @NavButton(Tab.Upgrades, "nav.upgrades", HasUpgradeDot())
         @NavButton(Tab.Orders, "nav.orders", S.Orders.ClaimableCount > 0)
-        @NavButton(Tab.Events, "nav.events", HasEventsDot())
+        @NavButton(Tab.Events, "nav.rewards", HasEventsDot())
         @NavButton(Tab.Settings, "nav.settings", false)
     </nav>
 
+    @if (Host.DevMode)
+    {
+        <div class="demo-ribbon" aria-label="Versione dimostrativa">DEMO</div>
+    }
     @if (_banner != null)
     {
         <div class="banner" role="status" data-test="banner">@_banner</div>
@@ -88,6 +95,10 @@ else
     else if (_showDaily && S.Daily.Pending != null)
     {
         @DailyModal()
+    }
+    else if (_welcome != null)
+    {
+        @WelcomeModal()
     }
     else if (_crateReveal != null)
     {
@@ -263,6 +274,10 @@ else
                         <small>@(done ? "" : Loc.T("orders.progress", Fmt.Num(v.Progress), Fmt.Num(v.Def.Target)))</small>
                         @if (v.RemainingSeconds > 0) { <small class="accent">@Loc.T("orders.deadline", Fmt.Time(v.RemainingSeconds))</small> }
                         <button class="btn good small" data-test="@("claim-" + id)" disabled="@(!done)" @onclick="() => ClaimOrder(id)">@(done ? Loc.T("orders.claim") : Loc.T("orders.in_progress"))</button>
+                        @if (done && Host.AdsAvailable)
+                        {
+                            <button class="btn steel small video" data-test="@("claim2x-" + id)" disabled="@(S.Monetization.CanOfferOrderDouble(id) != AdFailReason.None)" @onclick="() => OrderDouble(id)">@Loc.T("orders.claim_video", Fmt.Mult(S.Config.Ads.OrderAdMultiplier))</button>
+                        }
                     </div>
                 </div>
             }
@@ -271,6 +286,8 @@ else
     // ===================================================================== events
     RenderFragment EventsTab() =>
         @<div class="panel">
+            <h2>@Loc.T("rewards.header")</h2>
+            @RewardsHub()
             <h2>@Loc.T("events.header")</h2>
             <p class="hint">@Loc.T("events.free_note")</p>
             @ExperimentalCard()
@@ -559,6 +576,69 @@ else
                     }
                 </div>
                 <button class="btn good" @onclick="() => _phaseModal = -1">@Loc.T("common.ok")</button>
+            </div>
+        </div>;
+
+    // ===================================================================== rewards hub (daily, videos, invites)
+    RenderFragment RewardsHub() =>
+        @<div class="hub">
+            <div class="card gift-card" data-test="hub-daily">
+                <h3>@Loc.T("daily.title")</h3>
+                @if (S.Daily.Pending != null)
+                {
+                    <p>@Loc.T("daily.day", S.Daily.Pending.DayIndex + 1) · <b>@DailyText(S.Daily.Pending.Def)</b></p>
+                    <button class="btn good" @onclick="OpenDaily">@Loc.T("daily.open")</button>
+                }
+                else
+                {
+                    <p class="hint">@Loc.T("daily.tomorrow")</p>
+                }
+            </div>
+            @if (Host.AdsAvailable)
+            {
+                var canCrate = S.Monetization.CanOfferCrate();
+                var canBoost = S.Monetization.CanOfferBoost();
+                double rem = S.Production.BoostRemaining("ad");
+                <div class="card video-card" data-test="hub-videos">
+                    <h3>@Loc.T("video.title")</h3>
+                    <button class="btn steel video" data-test="video-crate" disabled="@(canCrate != AdFailReason.None)" @onclick="CrateAd">
+                        @Loc.T("video.crate", S.Monetization.CrateAdsLeftToday, S.Config.Ads.CrateAdsPerDay)
+                    </button>
+                    <button class="btn steel video" data-test="video-boost" disabled="@(canBoost != AdFailReason.None)" @onclick="BoostAd">
+                        @(rem > 0 ? Loc.T("boost.ad_active") + " " + Fmt.Time(rem) : Loc.T("boost.ad", Fmt.Mult(S.Config.Ads.BoostMultiplier), Fmt.Time(S.Config.Ads.BoostSeconds)))
+                    </button>
+                    <small>@Loc.T("video.note")</small>
+                </div>
+            }
+            @if (S.Social.Enabled)
+            {
+                <div class="card invite-card" data-test="hub-invite">
+                    <h3>@Loc.T("invite.title")</h3>
+                    <p>@Loc.T("invite.body")</p>
+                    <div class="code">@Loc.T("invite.your_code") <b data-test="invite-code">@S.Social.Code</b></div>
+                    <button class="btn good" data-test="invite-share" @onclick="ShareInvite">
+                        @(S.Social.CanClaimShare ? Loc.T("invite.share_reward") : Loc.T("invite.share"))
+                    </button>
+                    @if (!S.Social.ReferralApplied)
+                    {
+                        <div class="code-entry">
+                            <input data-test="invite-input" maxlength="6" placeholder="@Loc.T("invite.enter_placeholder")" @bind="_codeInput" @bind:event="oninput" autocapitalize="characters" autocomplete="off" spellcheck="false" />
+                            <button class="btn steel small" data-test="invite-apply" disabled="@string.IsNullOrWhiteSpace(_codeInput)" @onclick="() => ApplyCode(_codeInput)">@Loc.T("invite.apply")</button>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(_inviteMessage)) { <p class="hint accent" data-test="invite-message">@_inviteMessage</p> }
+                    <small>@Loc.T("invite.note")</small>
+                </div>
+            }
+        </div>;
+
+    RenderFragment WelcomeModal() =>
+        @<div class="modal-backdrop">
+            <div class="modal welcome" role="dialog" aria-modal="true" data-test="welcome-modal">
+                <h2>@Loc.T("welcome.title")</h2>
+                <p>@Loc.T("welcome.body", _welcome)</p>
+                <p class="big">@Fmt.Cr(S.Social.WelcomeCurrency) + @Loc.T("daily.crate", S.Config.Social.WelcomeCrates)</p>
+                <button class="btn good" id="welcome-claim" data-test="welcome-claim" @onclick="ClaimWelcome">@Loc.T("welcome.claim")</button>
             </div>
         </div>;
 }

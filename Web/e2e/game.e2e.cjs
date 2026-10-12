@@ -73,7 +73,7 @@ async function tapN(page, n) { for (let i = 0; i < n; i++) await page.locator(t(
 async function tab(page, name) { await closeCelebrations(page); await page.locator(t('nav-' + name)).click(); }
 // Celebration popups (new phase, crate reveal, daily gift) are part of the design: tests acknowledge them like a player.
 async function closeCelebrations(page) {
-  for (const m of ['phase-modal', 'crate-modal', 'daily-modal']) {
+  for (const m of ['phase-modal', 'crate-modal', 'daily-modal', 'welcome-modal']) {
     const loc = page.locator(t(m));
     if (await loc.count()) await loc.locator('button').last().click();
   }
@@ -347,5 +347,87 @@ test('release: animations stay smooth (no long main-thread stalls while tapping 
   const long = await page.evaluate(() => window.__long);
   const worst = long.length ? Math.max(...long) : 0;
   assert.ok(worst < 250, 'longest main-thread task ' + worst + 'ms');
+  await context.close();
+});
+
+// ---------------------------------------------------------------- social & rewarded placements (0.4.0)
+test('release: the mascot greets the player and gives tips when tapped', async () => {
+  const { context, page, problems } = await open(releaseUrl);
+  await page.locator('.mascot .bubble').waitFor();
+  assert.match(await page.locator('.mascot .bubble').textContent(), /Bullo/);
+  await page.locator('.mascot-btn').click({ force: true });   // it bobs continuously, so it is never 'stable'
+  await page.locator('.mascot .bubble').waitFor();
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('release: invite link gives the friend a one-time welcome gift and is removed from the address bar', async () => {
+  const { context, page, problems } = await open(releaseUrl + '?ref=ABCD23');
+  await page.locator(t('welcome-modal')).waitFor();
+  assert.match(await page.locator(t('welcome-modal')).textContent(), /ABCD23/);
+  await shot(page, '11-benvenuto');
+  await page.locator(t('welcome-claim')).click();
+  await page.waitForFunction(() => document.querySelector('[data-test="balance"]').textContent.trim() !== '0 Cr');
+  assert.equal(new URL(page.url()).searchParams.get('ref'), null, 'ref param removed');
+  await page.goto(releaseUrl + '?ref=XYZW45');
+  await page.locator(t('balance')).waitFor();
+  await page.waitForTimeout(500);
+  assert.equal(await page.locator(t('welcome-modal')).count(), 0, 'only once per device');
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('release: malformed invite codes are ignored safely', async () => {
+  const { context, page, problems } = await open(releaseUrl + '?ref=%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E');
+  await page.waitForTimeout(500);
+  assert.equal(await page.locator(t('welcome-modal')).count(), 0);
+  assert.equal(await page.locator('img[src="x"]').count(), 0);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('release: sharing the invite rewards a crate once per day; own code is rejected', async () => {
+  const { context, page, problems } = await open(releaseUrl, { permissions: ['clipboard-read', 'clipboard-write'] });
+  await tab(page, 'events');
+  const code = (await page.locator(t('invite-code')).textContent()).trim();
+  assert.match(code, /^[A-Z2-9]{6}$/);
+  await page.locator(t('invite-share')).click();                  // no share sheet in headless Chromium -> link copied
+  await page.locator(t('invite-message')).waitFor();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  assert.ok(copied.includes('?ref=' + code), copied);
+  await page.waitForFunction(() => /Casse disponibili: 1/.test(document.querySelector('[data-test="crate"]').textContent));
+  await page.locator(t('invite-share')).click();
+  await page.waitForTimeout(300);
+  assert.match(await page.locator(t('crate')).textContent(), /Casse disponibili: 1/, 'no second reward the same day');
+  await page.locator(t('invite-input')).fill(code);
+  await page.locator(t('invite-apply')).click();
+  assert.match(await page.locator(t('invite-message')).textContent(), /tuo codice/);
+  await shot(page, '12-premi');
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('dev: watch a video for a free crate (counter, only after the video ends)', { skip: !DEV_DIR }, async () => {
+  const { context, page, problems } = await open(devUrl);
+  await tab(page, 'events');
+  assert.match(await page.locator(t('video-crate')).textContent(), /3\/3/);
+  await page.locator(t('video-crate')).click();
+  await page.getByText('Annuncio di prova').waitFor();
+  assert.match(await page.locator(t('crate')).textContent(), /Casse disponibili: 0/, 'nothing before the video ends');
+  await page.waitForFunction(() => /Casse disponibili: 1/.test(document.querySelector('[data-test="crate"]')?.textContent || ''), null, { timeout: 15000 });
+  assert.match(await page.locator(t('video-crate')).textContent(), /2\/3/);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('dev: double an order reward with a video', { skip: !DEV_DIR }, async () => {
+  const { context, page, problems } = await open(devUrl);
+  await tapN(page, 10);
+  await tab(page, 'orders');
+  await page.locator(t('claim2x-t1')).click();
+  await page.waitForFunction(() => !document.querySelector('[data-test="order-t1"]'), null, { timeout: 15000 });
+  // 10 from taps + 2 x 15 doubled reward; the displayed balance rolls up, so wait for it
+  await page.waitForFunction(() => parseFloat(document.querySelector('[data-test="balance"]').textContent.replace(/[^0-9.]/g, '')) >= 40, null, { timeout: 10000 });
+  assert.deepEqual(problems, []);
   await context.close();
 });

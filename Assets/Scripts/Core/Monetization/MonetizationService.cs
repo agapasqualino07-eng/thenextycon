@@ -11,6 +11,8 @@ namespace OfficinaTycoon
         public const string PlacementOffline = "offline_bonus";
         public const string PlacementBoost = "production_boost";
         public const string PlacementDaily = "daily_bonus";
+        public const string PlacementCrate = "free_crate";
+        public const string PlacementOrder = "order_double";
 
         readonly GameConfig _cfg;
         readonly RewardedAdController _ads;
@@ -30,6 +32,71 @@ namespace OfficinaTycoon
         }
 
         public void AttachDaily(DailyRewardSystem daily) { _daily = daily; }
+
+        FreePartsCrate _crates;
+        OrderSystem _orders;
+        IClock _clock;
+        public string CrateAdDay { get; private set; } = "";
+        public int CrateAdCount { get; private set; }
+        public int CrateAdSeq { get; private set; }
+
+        public void AttachRewards(FreePartsCrate crates, OrderSystem orders, IClock clock) { _crates = crates; _orders = orders; _clock = clock; }
+
+        string Today => _clock.UtcNow.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
+        public int CrateAdsLeftToday => Math.Max(0, _cfg.Ads.CrateAdsPerDay - (CrateAdDay == Today ? CrateAdCount : 0));
+
+        public AdFailReason CanOfferCrate()
+        {
+            if (_crates == null || CrateAdsLeftToday <= 0) return AdFailReason.DailyLimit;
+            if (_crates.Available >= _crates.MaxStored) return AdFailReason.Busy;
+            return _ads.CanRequest();
+        }
+
+        /// <summary>"Watch a video for a free crate" (capped per day). The crate is granted only after a confirmed completion.</summary>
+        public AdFailReason RequestCrate(Action<bool, AdFailReason> onDone)
+        {
+            var can = CanOfferCrate();
+            if (can != AdFailReason.None) return can;
+            return _ads.Request(PlacementCrate, r =>
+            {
+                bool granted = false;
+                if (r.Completed && CrateAdsLeftToday > 0 && _ledger.TryClaim("ad_crate:" + CrateAdSeq))
+                {
+                    CrateAdSeq++;
+                    if (CrateAdDay != Today) { CrateAdDay = Today; CrateAdCount = 0; }
+                    CrateAdCount++;
+                    _crates.Grant(1, "ad_crate");
+                    granted = true;
+                    _analytics.Track(AnalyticsEvents.BonusGranted, AnalyticsParams.Of("type", "free_crate"));
+                }
+                onDone?.Invoke(granted, r.Reason);
+            });
+        }
+
+        public AdFailReason CanOfferOrderDouble(string orderId)
+        {
+            if (_orders == null || !_orders.IsCompleted(orderId)) return AdFailReason.Busy;
+            return _ads.CanRequest();
+        }
+
+        /// <summary>Claims a completed order with doubled currency after a confirmed video. A failed video leaves the order claimable as usual.</summary>
+        public AdFailReason RequestOrderDouble(string orderId, Action<bool, AdFailReason> onDone)
+        {
+            var can = CanOfferOrderDouble(orderId);
+            if (can != AdFailReason.None) return can;
+            return _ads.Request(PlacementOrder, r =>
+            {
+                bool granted = r.Completed && _orders.IsCompleted(orderId) && _orders.TryClaim(orderId, _cfg.Ads.OrderAdMultiplier);
+                if (granted) _analytics.Track(AnalyticsEvents.BonusGranted, AnalyticsParams.Of("type", "order_double"));
+                onDone?.Invoke(granted, r.Reason);
+            });
+        }
+
+        public void CaptureInto(AdSave s) { s.CrateAdDay = CrateAdDay; s.CrateAdCount = CrateAdCount; s.CrateAdSeq = CrateAdSeq; }
+        public void RestoreFrom(AdSave s)
+        {
+            CrateAdDay = s?.CrateAdDay ?? ""; CrateAdCount = Math.Max(0, s?.CrateAdCount ?? 0); CrateAdSeq = Math.Max(0, s?.CrateAdSeq ?? 0);
+        }
 
         public AdFailReason CanOfferDailyBonus()
         {

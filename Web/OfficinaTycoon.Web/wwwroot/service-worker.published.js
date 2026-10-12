@@ -35,6 +35,8 @@ async function onActivate(event) {
 async function onFetch(event) {
   let cachedResponse = null;
   const url = new URL(event.request.url);
+  // The demo lives in its own sub-folder with its own service worker: never answer for it from this cache.
+  if (url.pathname.startsWith(baseUrl.pathname + 'demo/') && !baseUrl.pathname.endsWith('/demo/')) return fetch(event.request);
   if (event.request.method === 'GET' && url.origin === self.location.origin) {
     const shouldServeIndexHtml = event.request.mode === 'navigate' && !manifestUrlList.some(u => u === event.request.url);
     const request = shouldServeIndexHtml ? new URL('index.html', baseUrl).href : event.request;

@@ -9,7 +9,9 @@ namespace OfficinaTycoon.Web.Services
     /// </summary>
     public sealed class GameHost : IDisposable
     {
-        public const string SavePrefix = "officina.";
+        // The demo build (dev tools, simulated videos) keeps its own save so it can never touch real progress
+        // even when served from the same site.
+        public static string SavePrefix => DevToolsCompiled ? "officina-demo." : "officina.";
 
         readonly IJSInProcessRuntime _js;
         DotNetObjectReference<GameHost> _selfRef;
@@ -50,7 +52,8 @@ namespace OfficinaTycoon.Web.Services
         public void Start(bool devRequested)
         {
             if (Session != null) return;
-            DevMode = DevToolsCompiled && devRequested;
+            // The demo build always runs in demo mode (simulated videos + dev tools); the public build never does.
+            DevMode = DevToolsCompiled;
             _storage = new KeyValueSaveStorage(new BrowserKeyValueStore(_js), SavePrefix);
             CreateSession();
             _selfRef = DotNetObjectReference.Create(this);

@@ -32,5 +32,10 @@
 - [ ] Filtri categoria annunci: escludere gambling/scommesse/casinò e simili nel pannello del network. Non garantiscono l'assenza assoluta di annunci indesiderati.
 - [ ] Se si aggiunge analytics: minimizzazione dei dati, nessun identificatore diretto nei parametri (già applicato lato codice).
 
+### Stile "per bambini", inviti e premi (0.4.0)
+- [ ] **Pubblico**: lo stile cartoon può attrarre minori. Su Google Play un'app che si rivolge (anche) ai bambini deve rispettare il programma Famiglie: solo SDK pubblicitari certificati, niente annunci personalizzati per i minori, contenuti adatti. Su App Store: categoria Kids e relative regole se applicabile. Decidere il pubblico **prima** di integrare gli annunci.
+- [ ] **Premi per la condivisione**: verificare le regole aggiornate degli store e delle piattaforme social sugli incentivi alla condivisione (alcune piattaforme vietano di premiare le condivisioni sui propri servizi). Il gioco premia l'uso del pannello di condivisione del sistema, non un social specifico.
+- [ ] **Azzardo simulato**: il gioco non ha slot machine né ruote; la cassa gratuita mostra le probabilità e non si compra. Rispondere con precisione al questionario di classificazione.
+
 ## Esito
 Nessuna voce è stata verificata o approvata. Non dichiarare conformità o approvazione finché non si è completata la revisione reale.

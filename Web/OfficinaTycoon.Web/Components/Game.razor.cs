@@ -49,6 +49,13 @@ namespace OfficinaTycoon.Web.Components
         readonly Dictionary<string, int> _lastLevels = new Dictionary<string, int>();
         sealed class CrateReveal { public string Text; public bool Rare; }
         CrateReveal _crateReveal;
+        string _welcome;              // inviter code from the link, shown in the welcome popup
+        string _codeInput = "";
+        string _inviteMessage = "";
+        string _say;
+        DateTime _sayUntil;
+        DateTime _nextTipAt = DateTime.UtcNow.AddSeconds(4);
+        int _tipIndex;
 
         // floating "+N" texts on the tap button
         sealed class Floater { public int Id; public string Text; public int X; public DateTime Born; }
@@ -77,6 +84,40 @@ namespace OfficinaTycoon.Web.Components
             _showInstallHint = Js.Invoke<bool>("officina.isIos") && !Js.Invoke<bool>("officina.isStandalone") && !S.Settings.PrivacyAccepted;
             if (_showInstallHint) { S.Settings.PrivacyAccepted = true; S.Save(); }   // shown once
             MaybeAutoDaily();
+            // Invite link (?ref=CODE): untrusted input, validated by SocialSystem; the param is removed from the address bar.
+            string refCode = Js.Invoke<string>("officina.queryValue", "ref");
+            if (!string.IsNullOrEmpty(refCode))
+            {
+                Js.InvokeVoid("officina.clearQuery", "ref");
+                if (SocialSystem.IsValidCode(refCode) && !S.Social.ReferralApplied && SocialSystem.Normalize(refCode) != S.Social.Code)
+                    _welcome = SocialSystem.Normalize(refCode);
+            }
+            Say(Loc.T(S.Orders.TutorialCompleted ? "mascot.hello_back" : "mascot.hello"), 5);
+        }
+
+        // ---- mascot
+        void Say(string text, double seconds = 3.5) { _say = text; _sayUntil = DateTime.UtcNow.AddSeconds(seconds); }
+
+        void NextTip()
+        {
+            Sfx("tap");
+            var tips = Tips();
+            if (tips.Count == 0) return;
+            Say(tips[_tipIndex++ % tips.Count], 4);
+            _nextTipAt = DateTime.UtcNow.AddSeconds(25);
+        }
+
+        List<string> Tips()
+        {
+            var t = new List<string>();
+            if (S.Daily.Pending != null) t.Add(Loc.T("mascot.tip_daily"));
+            if (S.Crates.Available > 0) t.Add(Loc.T("mascot.tip_crate"));
+            if (S.Orders.ClaimableCount > 0) t.Add(Loc.T("mascot.tip_order"));
+            if (HasFactoryDot()) t.Add(Loc.T("mascot.tip_machine"));
+            if (Host.AdsAvailable && S.Monetization.CanOfferCrate() == AdFailReason.None) t.Add(Loc.T("mascot.tip_video"));
+            if (S.Frenzy.Enabled && !S.Frenzy.Active) t.Add(Loc.T("mascot.tip_frenzy"));
+            if (S.Social.Enabled && S.Social.CanClaimShare) t.Add(Loc.T("mascot.tip_invite"));
+            return t;
         }
 
         void ResetVisualState()
@@ -114,6 +155,7 @@ namespace OfficinaTycoon.Web.Components
             if (_subscribedTo == S) return;
             _subscribedTo = S;
             S.Signals.MachineLevelChanged += OnMachineLevel;
+            S.Signals.MachineLevelChanged += (id, lvl) => Say(Loc.T(lvl == 1 ? "mascot.new_machine" : "mascot.cheer" + (lvl % 3)), 2.5);
             S.Signals.UpgradePurchased += id => { Sfx("upgrade"); Toast(Loc.T("toast.upgrade")); Fx("burstAt", "[data-test='upgrade-" + id + "']", "build"); };
             S.Signals.OrderClaimed += id =>
             {
@@ -126,6 +168,7 @@ namespace OfficinaTycoon.Web.Components
             {
                 Sfx("unlock");
                 Banner(Loc.T("frenzy.banner", Fmt.Mult(S.Config.Frenzy.Multiplier)));
+                Say(Loc.T("mascot.frenzy"), 3);
                 Fx("flash");
                 Fx("burstAt", "[data-test='tap']", "frenzy");
             };
@@ -158,6 +201,12 @@ namespace OfficinaTycoon.Web.Components
             if (target <= _shownBalance || Math.Abs(target - _shownBalance) <= Math.Max(1, target * 0.002)) _shownBalance = target;
             else _shownBalance += (target - _shownBalance) * 0.35;
             if (_banner != null && now >= _bannerUntil) _banner = null;
+            if (now >= _nextTipAt && now >= _sayUntil)
+            {
+                var tips = Tips();
+                if (tips.Count > 0) Say(tips[_tipIndex++ % tips.Count], 4);
+                _nextTipAt = now.AddSeconds(30);
+            }
             _floaters.RemoveAll(f => (now - f.Born).TotalSeconds > 1.0);
             if (_toast != null && now >= _toastUntil) _toast = null;
             if (_toast == null && _toastQueue.Count > 0) { _toast = _toastQueue.Dequeue(); _toastUntil = now.AddSeconds(2.4); }
@@ -303,6 +352,54 @@ namespace OfficinaTycoon.Web.Components
                 else Toast(AdReasonText(reason == AdFailReason.None ? AdFailReason.Error : reason));
             });
             if (r != AdFailReason.None) Toast(AdReasonText(r));
+        }
+
+        // ---- videos & invites
+        void CrateAd()
+        {
+            var r = S.Monetization.RequestCrate((granted, reason) =>
+            {
+                if (granted) { Sfx("reward"); Toast(Loc.T("toast.crate_earned")); Fx("confetti", 50); Say(Loc.T("mascot.tip_crate"), 3); }
+                else Toast(AdReasonText(reason == AdFailReason.None ? AdFailReason.Error : reason));
+            });
+            if (r != AdFailReason.None) Toast(AdReasonText(r));
+        }
+
+        void OrderDouble(string id)
+        {
+            var r = S.Monetization.RequestOrderDouble(id, (granted, reason) =>
+            {
+                if (granted) { S.Save(); Fx("confetti", 60); }
+                else Toast(AdReasonText(reason == AdFailReason.None ? AdFailReason.Error : reason));
+            });
+            if (r != AdFailReason.None) Toast(AdReasonText(r));
+        }
+
+        async Task ShareInvite()
+        {
+            string url = Js.Invoke<string>("officina.pageUrl") + "?ref=" + S.Social.Code;
+            string result = await JS.InvokeAsync<string>("officina.share", Loc.T("app.title"), Loc.T("invite.message"), url);
+            if (result == "shared" || result == "copied")
+            {
+                _inviteMessage = Loc.T(result == "shared" ? "invite.shared" : "invite.copied");
+                if (S.ClaimShareReward()) { Sfx("reward"); Toast(Loc.T("toast.crate_earned")); Fx("confetti", 50); }
+            }
+            else if (result == "failed") _inviteMessage = Loc.T("settings.copy_failed");
+        }
+
+        void ApplyCode(string code)
+        {
+            var r = S.ApplyReferral(code);
+            _inviteMessage = Loc.T("invite.result_" + r.ToString().ToLowerInvariant());
+            if (r == ReferralResult.Ok) { Sfx("reward"); Fx("confetti", 90); _codeInput = ""; }
+        }
+
+        void ClaimWelcome()
+        {
+            Fx("flyCoins", "#welcome-claim", "[data-test='balance']", 14);
+            var r = S.ApplyReferral(_welcome);
+            _welcome = null;
+            if (r == ReferralResult.Ok) { Sfx("reward"); Fx("confetti", 120); Say(Loc.T("mascot.welcome"), 4); }
         }
 
         string CrateGlow() => _crateReveal != null && _crateReveal.Rare ? "#ffd27a66" : "#78dcf533";

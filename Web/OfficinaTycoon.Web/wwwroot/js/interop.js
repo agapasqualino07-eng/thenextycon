@@ -67,5 +67,21 @@
     return new URLSearchParams(window.location.search).get(name) === '1';
   }
 
-  window.officina = { storage, lifecycle, sfx, isIos, isStandalone, copyText, queryFlag };
+  // Invite links: share sheet when available (iPhone), otherwise copy to clipboard.
+  async function share(title, text, url) {
+    try {
+      if (navigator.share) { await navigator.share({ title, text, url }); return 'shared'; }
+    } catch (e) { if (e && e.name === 'AbortError') return 'cancelled'; }
+    return (await copyText(text + ' ' + url)) ? 'copied' : 'failed';
+  }
+  function queryValue(name) { return new URLSearchParams(window.location.search).get(name) || ''; }
+  function clearQuery(name) {
+    try {
+      const u = new URL(window.location.href); u.searchParams.delete(name);
+      window.history.replaceState(null, '', u.pathname + u.search + u.hash);
+    } catch (e) { /* ignore */ }
+  }
+  function pageUrl() { return window.location.origin + window.location.pathname; }
+
+  window.officina = { storage, lifecycle, sfx, isIos, isStandalone, copyText, queryFlag, share, queryValue, clearQuery, pageUrl };
 })();

@@ -31,6 +31,7 @@ namespace OfficinaTycoon
         public readonly SaveManager Saves;
         public readonly FrenzySystem Frenzy;
         public readonly DailyRewardSystem Daily;
+        public readonly SocialSystem Social;
 
         public SettingsSave Settings = new SettingsSave();
         public StatsSave Stats = new StatsSave();
@@ -75,6 +76,8 @@ namespace OfficinaTycoon
             Frenzy = new FrenzySystem(config, Production, Signals);
             Daily = new DailyRewardSystem(config, Wallet, Production, Crates, Ledger, clock);
             Monetization.AttachDaily(Daily);
+            Monetization.AttachRewards(Crates, Orders, clock);
+            Social = new SocialSystem(config, Wallet, Production, Crates, Ledger, clock, r);
             WireAnalytics();
         }
 
@@ -89,6 +92,7 @@ namespace OfficinaTycoon
             Stats.Sessions++;
             Offline.CheckOffline(now, AdvanceWorld);
             Daily.Check();
+            Social.EnsureCode();
             Progression.Update();
             Orders.Update(0);
             Started = true;
@@ -168,12 +172,20 @@ namespace OfficinaTycoon
                 Surge = Surge.Capture(),
                 Crate = Crates.Capture(),
                 Offline = Offline.Capture(),
-                Ads = Ads.Capture(Monetization.BoostSeq),
+                Ads = CaptureAds(),
+                Social = Social.Capture(),
                 Daily = Daily.Capture(),
                 Claimed = Ledger.Snapshot(),
                 Settings = Settings,
                 Stats = Stats
             };
+        }
+
+        AdSave CaptureAds()
+        {
+            var a = Ads.Capture(Monetization.BoostSeq);
+            Monetization.CaptureInto(a);
+            return a;
         }
 
         public bool Save()
@@ -196,6 +208,8 @@ namespace OfficinaTycoon
             Ads.Restore(d.Ads);
             Monetization.Restore(d.Ads.BoostSeq);
             Daily.Restore(d.Daily);
+            Monetization.RestoreFrom(d.Ads);
+            Social.Restore(d.Social);
             Settings = d.Settings ?? new SettingsSave();
             Stats = d.Stats ?? new StatsSave();
             if (_externalRng == null && d.RngState != 0) Rng.State = d.RngState;
@@ -246,6 +260,22 @@ namespace OfficinaTycoon
         }
 
         public void DeclineExperimental() { Experimental.TryDecline(); Save(); }
+
+        /// <summary>Applies an invite code from a link (one-time welcome gift).</summary>
+        public ReferralResult ApplyReferral(string code)
+        {
+            var r = Social.ApplyReferral(code);
+            if (r == ReferralResult.Ok) { Analytics.Track(AnalyticsEvents.ReferralWelcomeClaimed); Save(); }
+            return r;
+        }
+
+        /// <summary>Reward for sharing the invite (once per day). Call only after a successful share.</summary>
+        public bool ClaimShareReward()
+        {
+            bool ok = Social.ClaimShare();
+            if (ok) { Analytics.Track(AnalyticsEvents.InviteShared); Save(); }
+            return ok;
+        }
 
         /// <summary>Claims today's gift (doubled if the optional ad bonus was earned). Always available without ads.</summary>
         public bool ClaimDaily()

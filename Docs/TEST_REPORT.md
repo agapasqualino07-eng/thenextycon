@@ -2,7 +2,10 @@
 
 Ambiente: container Linux, .NET SDK 8.0.131 (apt), NUnit 3.14, Microsoft.NET.Test.Sdk 17.11.1, C# LangVersion 9 (come Unity 6). **Unity Editor non disponibile.**
 
-## Risultato eseguito (aggiornato alla 0.3.0: 232 unitari, 16 nel browser)
+## Risultato eseguito (aggiornato alla 0.4.0: 252 unitari, 22 nel browser)
+In 0.4.0: `SocialAndRewardsTests` (codice invito, link non validi o con tentativi di iniezione, proprio codice, una volta per dispositivo, condivisione una volta al giorno con orologio all'indietro, cassa via video con limite giornaliero e richiamate ripetute, ordine x2 via video anche se riscosso durante il video, **compatibilità con salvataggi 0.2/0.3**) e 6 test nel browser (mascotte, link di invito, codici malformati, condivisione, cassa via video, ordine x2).
+
+### Risultati 0.3.0
 In 0.3.0 si aggiungono `EngagementTests` (Frenesia, regalo giornaliero: orologio, riavvii, bonus video una sola volta, nessun azzeramento) e 6 test nel browser: scena animata, Frenesia, regalo giornaliero, traguardo di livello e nuova fase, effetti ridotti, fluidità (task più lungo del thread principale < 250 ms su Chromium desktop: indicativo, non una misura su iPhone).
 
 ### Risultati 0.2.0

@@ -25,6 +25,8 @@ namespace OfficinaTycoon
         public const string BonusGranted = "bonus_granted";
         public const string DailyRewardClaimed = "daily_reward_claimed";
         public const string FrenzyTriggered = "frenzy_triggered";
+        public const string InviteShared = "invite_shared";
+        public const string ReferralWelcomeClaimed = "referral_welcome_claimed";
     }
 
     /// <summary>

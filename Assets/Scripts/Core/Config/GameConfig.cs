@@ -23,6 +23,7 @@ namespace OfficinaTycoon
         public AdsConfig Ads = new AdsConfig();
         public FrenzyConfig Frenzy = new FrenzyConfig();
         public DailyConfig Daily = new DailyConfig();
+        public SocialConfig Social = new SocialConfig();
     }
 
     [Serializable]
@@ -260,12 +261,31 @@ namespace OfficinaTycoon
         public List<DailyRewardDef> Days = new List<DailyRewardDef>();
     }
 
+    /// <summary>
+    /// Invites without a server: every player has a share code. A friend who opens an invite link gets a one-time welcome
+    /// gift on their device; the inviter gets a small reward for sharing (once per day). Rewarding the inviter when the
+    /// friend actually plays needs a server to verify it and is NOT implemented.
+    /// </summary>
+    [Serializable]
+    public class SocialConfig
+    {
+        public bool Enabled = true;
+        public int WelcomeCrates = 1;
+        public double WelcomeOpsSeconds = 300;
+        public double WelcomeMin = 500;
+        public int ShareCrates = 1;
+    }
+
     [Serializable]
     public class AdsConfig
     {
         public bool Enabled = true;
-        public double MinSecondsBetweenAds = 120;
-        public int MaxPerDay = 8;
+        public double MinSecondsBetweenAds = 60;
+        public int MaxPerDay = 12;
+        /// <summary>"Watch a video for a free crate": at most this many per day (inside MaxPerDay).</summary>
+        public int CrateAdsPerDay = 3;
+        /// <summary>"Double the order reward with a video": currency multiplier.</summary>
+        public double OrderAdMultiplier = 2.0;
         public double ShowTimeoutSeconds = 120;
         public double BoostMultiplier = 2.0;
         public double BoostSeconds = 300;

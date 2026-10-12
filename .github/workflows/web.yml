@@ -74,9 +74,11 @@ jobs:
           name: officina-tycoon-web
           path: out/release/wwwroot
 
-      - name: Prepare GitHub Pages artifact
+      - name: Prepare GitHub Pages artifact (public app + demo in /demo/)
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        run: touch out/release/wwwroot/.nojekyll
+        run: |
+          cp -r out/dev/wwwroot out/release/wwwroot/demo
+          touch out/release/wwwroot/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
