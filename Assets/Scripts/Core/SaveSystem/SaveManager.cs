@@ -64,6 +64,51 @@ namespace OfficinaTycoon
         }
     }
 
+    /// <summary>Minimal synchronous key-value store (e.g. browser localStorage via in-process JS interop).</summary>
+    public interface IKeyValueStore
+    {
+        string Get(string key);
+        void Set(string key, string value);
+        void Remove(string key);
+    }
+
+    public sealed class InMemoryKeyValueStore : IKeyValueStore
+    {
+        public readonly Dictionary<string, string> Data = new Dictionary<string, string>();
+        public string Get(string key) => Data.TryGetValue(key, out var v) ? v : null;
+        public void Set(string key, string value) { Data[key] = value; }
+        public void Remove(string key) { Data.Remove(key); }
+    }
+
+    /// <summary>
+    /// ISaveStorage over a key-value store. Each Set of a key-value store like localStorage is atomic, so the
+    /// strategy is: copy current main -> .bak, then overwrite main. Corrupt data is moved aside, never deleted.
+    /// </summary>
+    public sealed class KeyValueSaveStorage : ISaveStorage
+    {
+        readonly IKeyValueStore _kv;
+        readonly string _prefix;
+        public KeyValueSaveStorage(IKeyValueStore kv, string prefix = "officina.") { _kv = kv; _prefix = prefix; }
+        string K(string name) => _prefix + name;
+
+        public string Read(string name) => _kv.Get(K(name));
+
+        public void Write(string name, string text)
+        {
+            string old = _kv.Get(K(name));
+            if (old != null) _kv.Set(K(name + ".bak"), old);
+            _kv.Set(K(name), text);
+        }
+
+        public void Quarantine(string name)
+        {
+            string v = _kv.Get(K(name));
+            if (v == null) return;
+            _kv.Set(K(name + ".corrupt"), v);   // keeps only the latest corrupt copy (storage quota is small in browsers)
+            _kv.Remove(K(name));
+        }
+    }
+
     public enum LoadStatus { NewGame, Loaded, RecoveredFromBackup, CorruptStartedNew, TooNewStartedNew }
 
     public sealed class LoadResult
@@ -91,19 +136,39 @@ namespace OfficinaTycoon
             _migrator = migrator ?? SaveMigrator.CreateDefault();
         }
 
+        /// <summary>Largest save text accepted when loading or importing (real saves are a few KB).</summary>
+        public const int MaxSaveChars = 1_000_000;
+
+        /// <summary>Serialises a save into the checksummed envelope (also used for "export save").</summary>
+        public string Encode(SaveData data)
+        {
+            data.Version = _migrator.TargetVersion;
+            string payload = JsonMapper.ToJson(data);
+            var env = new Dictionary<string, object>
+            {
+                ["v"] = (long)data.Version,
+                ["sum"] = Checksum(payload),
+                ["payload"] = payload
+            };
+            return MiniJson.Serialize(env);
+        }
+
+        /// <summary>
+        /// Validates and decodes an envelope (size, JSON, checksum, version, migration) WITHOUT writing anything.
+        /// Used both by Load and by "import save", so untrusted text goes through exactly the same checks.
+        /// </summary>
+        public bool TryDecode(string text, out SaveData data, out string error)
+        {
+            data = TryParse(text, out bool tooNew);
+            error = data != null ? "" : (tooNew ? "too_new" : "invalid");
+            return data != null;
+        }
+
         public bool Save(SaveData data)
         {
             try
             {
-                data.Version = _migrator.TargetVersion;
-                string payload = JsonMapper.ToJson(data);
-                var env = new Dictionary<string, object>
-                {
-                    ["v"] = (long)data.Version,
-                    ["sum"] = Checksum(payload),
-                    ["payload"] = payload
-                };
-                _storage.Write(MainName, MiniJson.Serialize(env));
+                _storage.Write(MainName, Encode(data));
                 return true;
             }
             catch (Exception)
@@ -149,6 +214,7 @@ namespace OfficinaTycoon
             tooNew = false;
             try
             {
+                if (string.IsNullOrEmpty(text) || text.Length > MaxSaveChars) return null;
                 if (!(MiniJson.Parse(text) is Dictionary<string, object> env)) return null;
                 if (!env.TryGetValue("payload", out var po) || !(po is string payload)) return null;
                 if (!env.TryGetValue("sum", out var so) || !(so is string sum) || sum != Checksum(payload)) return null;

@@ -1,0 +1,446 @@
+@implements IDisposable
+@inject GameHost Host
+@inject IJSRuntime JS
+
+@if (S == null)
+{
+    <div class="boot">Officina Tycoon<br /><small>Avvio…</small></div>
+}
+else
+{
+<div class="app">
+    <header class="topbar">
+        <div class="balance" data-test="balance">@Fmt.Cr(S.Wallet.Balance)</div>
+        <div class="ops" data-test="ops">@Loc.T("top.ops", Fmt.Num(S.Production.OutputPerSecond))</div>
+        <div class="phase">@Loc.T("top.phase", S.Progression.Phase.Name)</div>
+        <div class="boost">@BoostText()</div>
+        <div class="bar"><div class="fill steel" style="width:@Pct(S.Progression.NextPhaseProgress)"></div></div>
+    </header>
+
+    <section class="factory" aria-label="Fabbrica">
+        @for (int i = 0; i < S.Config.Machines.Count; i++)
+        {
+            var m = S.Config.Machines[i];
+            int lvl = S.Production.Level(m.Id);
+            bool unlocked = S.Production.IsUnlocked(m.Id);
+            <div class="tile @(lvl > 0 ? "owned" : unlocked ? "available" : "locked")" title="@m.Name">
+                <svg viewBox="-50 -50 100 100" class="gear @(i % 2 == 0 ? "cw" : "ccw")" style="@GearStyle(i, lvl)" aria-hidden="true">
+                    <path d="@GearPath(6 + i)" fill="@MachineColors[i % MachineColors.Length]" fill-rule="evenodd" />
+                </svg>
+                <span class="lvl">@(lvl > 0 ? lvl.ToString() : unlocked ? "+" : "")</span>
+            </div>
+        }
+    </section>
+
+    <button class="tap" data-test="tap" @onclick="OnTap">
+        @Loc.T("tap.button") <b>@Loc.T("tap.value", Fmt.Num(S.Production.TapValue))</b>
+        @foreach (var f in _floaters)
+        {
+            <span class="floater" style="left:@(f.X)%" @key="f.Id">+@f.Text</span>
+        }
+    </button>
+
+    <main class="content" data-test="content">
+        @switch (_tab)
+        {
+            case Tab.Factory: @FactoryTab() break;
+            case Tab.Upgrades: @UpgradesTab() break;
+            case Tab.Orders: @OrdersTab() break;
+            case Tab.Events: @EventsTab() break;
+            case Tab.Settings: @SettingsTab() break;
+        }
+    </main>
+
+    <nav class="tabs">
+        @NavButton(Tab.Factory, "nav.factory", HasFactoryDot())
+        @NavButton(Tab.Upgrades, "nav.upgrades", HasUpgradeDot())
+        @NavButton(Tab.Orders, "nav.orders", S.Orders.ClaimableCount > 0)
+        @NavButton(Tab.Events, "nav.events", HasEventsDot())
+        @NavButton(Tab.Settings, "nav.settings", false)
+    </nav>
+
+    @if (_toast != null)
+    {
+        <div class="toast" role="status" data-test="toast">@_toast</div>
+    }
+
+    @if (S.Offline.Pending != null && _showOffline)
+    {
+        @OfflineModal()
+    }
+
+    @if (_adCallbacks != null)
+    {
+        <div class="modal-backdrop">
+            <div class="modal" role="dialog" aria-modal="true">
+                <h2>@Loc.T("ad.mock.title")</h2>
+                <p>@Loc.T("ad.mock.body", Math.Max(0, (int)Math.Ceiling(_adSecondsLeft)) + "s")</p>
+                <button class="btn neutral" @onclick="CloseMockAdEarly">@Loc.T("ad.mock.close")</button>
+            </div>
+        </div>
+    }
+
+    @if (_showInstallHint)
+    {
+        <div class="modal-backdrop">
+            <div class="modal" role="dialog" aria-modal="true" data-test="install-hint">
+                <h2>@Loc.T("install.title")</h2>
+                <p>@Loc.T("install.body")</p>
+                <button class="btn good" @onclick="() => _showInstallHint = false">@Loc.T("common.ok")</button>
+            </div>
+        </div>
+    }
+</div>
+}
+
+@code {
+    RenderFragment NavButton(Tab tab, string key, bool dot) =>
+        @<button class="nav @(_tab == tab ? "active" : "")" data-test="@("nav-" + tab.ToString().ToLowerInvariant())" @onclick="() => SwitchTab(tab)">
+            @Loc.T(key)
+            @if (dot) { <span class="dot" aria-label="novità"></span> }
+        </button>;
+
+    // ===================================================================== machines
+    RenderFragment FactoryTab() =>
+        @<div class="panel">
+            <div class="modes">
+                <span>@Loc.T("machine.buy", "")</span>
+                <button class="mode @(_buyMode == 1 ? "on" : "")" @onclick="() => _buyMode = 1">x1</button>
+                <button class="mode @(_buyMode == 10 ? "on" : "")" @onclick="() => _buyMode = 10">x10</button>
+                <button class="mode @(_buyMode == 0 ? "on" : "")" @onclick="() => _buyMode = 0">@Loc.T("machine.max")</button>
+            </div>
+            @if (Host.AdsAvailable)
+            {
+                var can = S.Monetization.CanOfferBoost();
+                double rem = S.Production.BoostRemaining("ad");
+                <div class="card">
+                    <button class="btn good" disabled="@(can != AdFailReason.None)" @onclick="BoostAd">
+                        @(rem > 0 ? Loc.T("boost.ad_active") + " " + Fmt.Time(rem) : Loc.T("boost.ad", Fmt.Mult(S.Config.Ads.BoostMultiplier), Fmt.Time(S.Config.Ads.BoostSeconds)))
+                    </button>
+                    <small>@(can == AdFailReason.None || can == AdFailReason.Busy ? Loc.T("boost.ad_note") : AdReasonText(can)) · @Loc.T("settings.mock_note")</small>
+                </div>
+            }
+            @for (int i = 0; i < S.Config.Machines.Count; i++)
+            {
+                var d = S.Config.Machines[i];
+                int idx = i;
+                int lvl = S.Production.Level(d.Id);
+                bool unlocked = S.Production.IsUnlocked(d.Id);
+                <div class="row" data-test="@("machine-" + d.Id)">
+                    <svg viewBox="-50 -50 100 100" class="icon @(lvl > 0 ? "" : "dim")" aria-hidden="true"><path d="@GearPath(6 + idx)" fill="@MachineColors[idx % MachineColors.Length]" fill-rule="evenodd" /></svg>
+                    <div class="info">
+                        @if (!unlocked)
+                        {
+                            <b>???</b><small>@UnlockText(d)</small>
+                        }
+                        else
+                        {
+                            <b>@d.Name</b>
+                            <small>@Loc.T("machine.level", lvl) · @Loc.T("machine.output", Fmt.Num(S.Production.MachineOutput(d.Id)))<br />@Loc.T("machine.produces", d.Good)</small>
+                        }
+                    </div>
+                    @if (unlocked)
+                    {
+                        if (lvl >= d.MaxLevel)
+                        {
+                            <button class="btn buy" disabled>@Loc.T("machine.maxed")</button>
+                        }
+                        else
+                        {
+                            int n = BuyCount(d);
+                            double cost = S.Production.NextCost(d.Id, n);
+                            <button class="btn buy" data-test="@("buy-" + d.Id)" disabled="@(!S.Wallet.CanAfford(cost))" @onclick="() => BuyMachine(d)">
+                                @Loc.T("machine.buy", Loc.T("machine.buy_x", n))<br /><b>@Fmt.Cr(cost)</b>
+                            </button>
+                        }
+                    }
+                </div>
+            }
+        </div>;
+
+    // ===================================================================== upgrades + overhaul
+    RenderFragment UpgradesTab() =>
+        @<div class="panel">
+            <h2>@Loc.T("upg.header")</h2>
+            @foreach (var u in S.Config.Upgrades)
+            {
+                var up = u;
+                bool owned = S.Production.HasUpgrade(u.Id);
+                bool avail = S.Production.IsUpgradeAvailable(u.Id);
+                <div class="row" data-test="@("upgrade-" + u.Id)">
+                    <div class="info">
+                        <b>@u.Name</b>
+                        <small>
+                            @if (owned || avail) { @u.Description }
+                            else if (S.Progression.PhaseIndex < u.UnlockPhase) { @Loc.T("upg.locked_phase", S.Config.Phases[u.UnlockPhase].Name) }
+                            else { @Loc.T("upg.locked_machine", S.Config.Machines.FirstOrDefault(m => m.Id == u.RequiresMachineId)?.Name ?? "?", u.RequiresMachineLevel) }
+                        </small>
+                    </div>
+                    @if (owned)
+                    {
+                        <button class="btn buy" disabled>@Loc.T("upg.owned")</button>
+                    }
+                    else
+                    {
+                        <button class="btn buy" disabled="@(!avail || !S.Wallet.CanAfford(u.Cost))" @onclick="() => BuyUpgrade(up)">
+                            @(avail ? Loc.T("upg.buy") : "")<br /><b>@Fmt.Cr(u.Cost)</b>
+                        </button>
+                    }
+                </div>
+            }
+            <h2>@Loc.T("overhaul.header", S.Production.Parts)</h2>
+            <p class="hint">@Loc.T("overhaul.hint", Fmt.Percent(S.Config.Economy.OverhaulBonus * 100))</p>
+            @foreach (var m in S.Config.Machines.Where(x => S.Production.Level(x.Id) > 0))
+            {
+                var md = m;
+                int cost = S.Production.OverhaulPartsCost(m.Id);
+                <div class="row">
+                    <div class="info"><b>@Loc.T("overhaul.row", m.Name, S.Production.OverhaulLevel(m.Id), S.Config.Economy.OverhaulMaxLevel)</b></div>
+                    @if (cost == int.MaxValue)
+                    {
+                        <button class="btn buy steel" disabled>@Loc.T("overhaul.max")</button>
+                    }
+                    else
+                    {
+                        <button class="btn buy steel" disabled="@(S.Production.Parts < cost)" @onclick="() => Overhaul(md)">@Loc.T("overhaul.buy", cost)</button>
+                    }
+                </div>
+            }
+        </div>;
+
+    // ===================================================================== orders
+    RenderFragment OrdersTab() =>
+        @<div class="panel">
+            <h2>@Loc.T("orders.header")</h2>
+            @{ var views = S.Orders.Views().ToList(); }
+            @if (views.Count == 0)
+            {
+                <p class="hint">@Loc.T("orders.empty")</p>
+            }
+            @foreach (var v in views)
+            {
+                var id = v.Def.Id;
+                bool done = v.Status == OrderStatus.Completed;
+                <div class="card order" data-test="@("order-" + id)">
+                    <div class="order-head">
+                        <b>@v.Def.Title</b>
+                        <span class="reward">
+                            @Loc.T("orders.reward", Fmt.Cr(v.RewardCurrency))@(v.Def.RewardCrates > 0 ? Loc.T("orders.reward_crate", v.Def.RewardCrates) : "")@(v.Def.RewardParts > 0 ? Loc.T("orders.reward_parts", v.Def.RewardParts) : "")
+                        </span>
+                    </div>
+                    <small>@v.Def.Description</small>
+                    <div class="bar"><div class="fill good" style="width:@Pct(v.Fraction)"></div></div>
+                    <div class="order-foot">
+                        <small>@(done ? "" : Loc.T("orders.progress", Fmt.Num(v.Progress), Fmt.Num(v.Def.Target)))</small>
+                        @if (v.RemainingSeconds > 0) { <small class="accent">@Loc.T("orders.deadline", Fmt.Time(v.RemainingSeconds))</small> }
+                        <button class="btn good small" data-test="@("claim-" + id)" disabled="@(!done)" @onclick="() => ClaimOrder(id)">@(done ? Loc.T("orders.claim") : Loc.T("orders.in_progress"))</button>
+                    </div>
+                </div>
+            }
+        </div>;
+
+    // ===================================================================== events
+    RenderFragment EventsTab() =>
+        @<div class="panel">
+            <h2>@Loc.T("events.header")</h2>
+            <p class="hint">@Loc.T("events.free_note")</p>
+            @ExperimentalCard()
+            @SurgeCard()
+            @CrateCard()
+        </div>;
+
+    RenderFragment ExperimentalCard() =>
+        @<div class="card" data-test="experimental">
+            <h3>@Loc.T("exp.title")</h3>
+            @{ var e = S.Experimental; var cfg = S.Config.Experimental; }
+            @if (S.Progression.PhaseIndex < cfg.UnlockPhase)
+            {
+                <p>@Loc.T("exp.locked", S.Config.Phases[cfg.UnlockPhase].Name)</p>
+            }
+            else if (e.Stage == EventStage.Cooldown)
+            {
+                <p>@Loc.T("exp.cooldown", Fmt.Time(e.TimerRemaining))</p>
+            }
+            else if (e.Stage == EventStage.Offered)
+            {
+                var pv = e.GetPreview();
+                double minMult = cfg.Outcomes.Count == 0 ? 1 : cfg.Outcomes.Min(o => o.ReturnMultiplier);
+                <p>@Loc.T("exp.offer_intro")</p>
+                <div class="option">
+                    <b>@Loc.T("exp.prudent")</b>
+                    <small>@Loc.T("exp.prudent_info", Fmt.Cr(pv.CostPrudent), Fmt.Cr(pv.PrudentReward), Fmt.Time(pv.PrudentDuration))</small>
+                    <button class="btn good" data-test="exp-prudent" disabled="@(!pv.CanAffordPrudent)" @onclick="() => ExpAccept(ExperimentChoice.Prudent)">
+                        @(!pv.CanAffordPrudent ? Loc.T("exp.not_enough") : Armed("exp:Prudent") ? Loc.T("exp.confirm", Fmt.Cr(pv.CostPrudent)) : Loc.T("exp.accept", Fmt.Cr(pv.CostPrudent)))
+                    </button>
+                </div>
+                <div class="option">
+                    <b>@Loc.T("exp.experimental")</b>
+                    <small>@Loc.T("exp.experimental_info", Fmt.Cr(pv.CostExperimental), Fmt.Time(pv.ExperimentalDuration))</small>
+                    <table class="odds" data-test="exp-odds">
+                        @foreach (var o in pv.Outcomes)
+                        {
+                            <tr><td>@Fmt.Percent(o.Percent)</td><td>@o.Label</td><td>@Fmt.Cr(o.Reward)@(o.BoostMultiplier > 1 ? Loc.T("exp.outcome_boost", Fmt.Mult(o.BoostMultiplier), Fmt.Time(o.BoostSeconds)) : "")</td></tr>
+                        }
+                    </table>
+                    <small>@Loc.T("exp.ev", Fmt.Percent(pv.ExperimentalExpectedMultiple * 100)) @Loc.T("exp.max_loss", Fmt.Percent(Math.Max(0, 1 - minMult) * 100))</small>
+                    <button class="btn steel" data-test="exp-test" disabled="@(!pv.CanAffordExperimental)" @onclick="() => ExpAccept(ExperimentChoice.Experimental)">
+                        @(!pv.CanAffordExperimental ? Loc.T("exp.not_enough") : Armed("exp:Experimental") ? Loc.T("exp.confirm", Fmt.Cr(pv.CostExperimental)) : Loc.T("exp.accept", Fmt.Cr(pv.CostExperimental)))
+                    </button>
+                </div>
+                <button class="btn neutral" data-test="exp-decline" @onclick="ExpDecline">@Loc.T("exp.decline")</button>
+            }
+            else if (e.Stage == EventStage.InProgress)
+            {
+                <p>@Loc.T("exp.in_progress", Fmt.Time(e.Timer))</p>
+            }
+            else
+            {
+                <p>@Loc.T("exp.ready", e.Choice == ExperimentChoice.Experimental ? e.PendingOutcomeLabel : Loc.T("exp.prudent_result"))<br />@Loc.T("exp.ready_payout", Fmt.Cr(e.PendingPayout))</p>
+                <button class="btn good" data-test="exp-collect" @onclick="ExpCollect">@Loc.T("exp.collect")</button>
+            }
+        </div>;
+
+    RenderFragment SurgeCard() =>
+        @<div class="card" data-test="surge">
+            <h3>@Loc.T("surge.title")</h3>
+            @{ var sv = S.Surge; double active = S.Production.BoostRemaining("surge"); }
+            @if (S.Progression.PhaseIndex < S.Config.Surge.UnlockPhase)
+            {
+                <p>@Loc.T("surge.locked", S.Config.Phases[S.Config.Surge.UnlockPhase].Name)</p>
+            }
+            else
+            {
+                if (active > 0)
+                {
+                    var b = S.Production.ActiveBoosts.First(x => x.source == "surge");
+                    <p class="accent">@Loc.T("surge.active", Fmt.Mult(b.multiplier), Fmt.Time(active))</p>
+                }
+                if (sv.Stage == EventStage.Offered)
+                {
+                    var pv = sv.GetPreview();
+                    <p>@Loc.T("surge.intro", Fmt.Time(sv.TimerRemaining))</p>
+                    <div class="option">
+                        <b>@Loc.T("surge.guaranteed")</b>
+                        <small>@Loc.T("surge.guaranteed_info", Fmt.Mult(pv.GuaranteedMultiplier), Fmt.Time(pv.GuaranteedSeconds))</small>
+                        <button class="btn good" data-test="surge-guaranteed" @onclick="() => SurgeChoose(SurgeChoice.Guaranteed)">@Loc.T("surge.guaranteed") · @Loc.T("common.free")</button>
+                    </div>
+                    <div class="option">
+                        <b>@Loc.T("surge.experiment")</b>
+                        <table class="odds">
+                            @foreach (var o in pv.Outcomes)
+                            {
+                                <tr><td>@Fmt.Percent(o.Percent)</td><td>@o.Label</td><td>@Fmt.Mult(o.Multiplier) · @Fmt.Time(o.Seconds)</td></tr>
+                            }
+                        </table>
+                        <small>@Loc.T("surge.ev", pv.ExperimentExpectedValue.ToString("0"), pv.GuaranteedValue.ToString("0"))</small>
+                        <button class="btn steel" data-test="surge-experiment" @onclick="() => SurgeChoose(SurgeChoice.Experiment)">@Loc.T("surge.experiment") · @Loc.T("common.free")</button>
+                    </div>
+                    <button class="btn neutral" @onclick="SurgeDismiss">@Loc.T("surge.dismiss")</button>
+                }
+                else
+                {
+                    <p>@Loc.T("surge.cooldown", Fmt.Time(sv.TimerRemaining))</p>
+                }
+            }
+        </div>;
+
+    RenderFragment CrateCard() =>
+        @<div class="card" data-test="crate">
+            <h3>@Loc.T("crate.title")</h3>
+            <p>@Loc.T("crate.count", S.Crates.Available, S.Crates.MaxStored)<br /><small>@Loc.T("crate.how")</small></p>
+            <small>@Loc.T("crate.odds")</small>
+            <table class="odds" data-test="crate-odds">
+                @foreach (var row in S.Crates.Rows())
+                {
+                    <tr>
+                        <td>@Fmt.Percent(row.Percent)</td>
+                        <td>
+                            @switch (row.Kind)
+                            {
+                                case CrateRewardKind.Currency: @Loc.T("crate.currency_label", row.Label, Fmt.Num(row.OpsSeconds)) break;
+                                case CrateRewardKind.TempBoost: @Loc.T("crate.boost_label", row.Label, Fmt.Mult(row.BoostMultiplier), Fmt.Time(row.BoostSeconds)) break;
+                                default: @Loc.T("crate.parts_label", row.Label, row.Parts) break;
+                            }
+                        </td>
+                    </tr>
+                }
+            </table>
+            @if (!string.IsNullOrEmpty(_crateResult)) { <p class="accent" data-test="crate-result">@_crateResult</p> }
+            <button class="btn good" data-test="crate-open" disabled="@(S.Crates.Available <= 0)" @onclick="OpenCrate">@(S.Crates.Available > 0 ? Loc.T("crate.open") : Loc.T("crate.none"))</button>
+        </div>;
+
+    // ===================================================================== settings
+    RenderFragment SettingsTab() =>
+        @<div class="panel">
+            <h2>@Loc.T("settings.header")</h2>
+            <button class="btn neutral" data-test="toggle-sfx" @onclick="ToggleSfx">@Loc.T("settings.sfx"): @Loc.T(S.Settings.SfxOn ? "settings.on" : "settings.off")</button>
+
+            <div class="card">
+                <h3>@Loc.T("settings.backup")</h3>
+                <p class="hint">@Loc.T("settings.backup_hint")</p>
+                <button class="btn steel" data-test="export" @onclick="CopyExport">@Loc.T("settings.export")</button>
+                <textarea rows="3" placeholder="@Loc.T("settings.import_placeholder")" @bind="_importText" @bind:event="oninput" data-test="import-text" maxlength="1000000" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+                <button class="btn steel" data-test="import" disabled="@string.IsNullOrWhiteSpace(_importText)" @onclick="Import">@(Armed("import") ? Loc.T("settings.import_confirm_btn") : Loc.T("settings.import"))</button>
+                @if (!string.IsNullOrEmpty(_importMessage)) { <p class="hint" data-test="import-message">@_importMessage</p> }
+            </div>
+
+            <div class="card">
+                <h3>@Loc.T("settings.privacy")</h3>
+                <p class="hint">@Loc.T("settings.privacy_web")</p>
+            </div>
+
+            <div class="card">
+                <h3>@Loc.T("install.title")</h3>
+                <p class="hint">@Loc.T("install.body")</p>
+            </div>
+
+            <button class="btn bad" data-test="reset" @onclick="Reset">@(Armed("reset") ? Loc.T("settings.reset_confirm") : Loc.T("settings.reset"))</button>
+            <p class="hint">@Loc.T("app.version", Host.Version)@(Host.AdsAvailable ? "" : " · " + Loc.T("settings.no_ads"))</p>
+
+            @if (Host.DevMode)
+            {
+                <div class="card dev" data-test="dev-tools">
+                    <h3>@Loc.T("settings.dev")</h3>
+                    <button class="btn steel" @onclick="() => DevMoney(1e3)">+1K Cr</button>
+                    <button class="btn steel" @onclick="() => DevMoney(1e6)">+1M Cr</button>
+                    <button class="btn steel" data-test="dev-1b" @onclick="() => DevMoney(1e9)">+1B Cr</button>
+                    <button class="btn steel" data-test="dev-away" @onclick="() => DevAway(3600)">Simula 1 ora offline</button>
+                    <button class="btn steel" @onclick="() => DevAway(36000)">Simula 10 ore offline (limite)</button>
+                    <button class="btn steel" @onclick="() => DevAway(-3600)">Simula orologio indietro di 1 ora</button>
+                    <button class="btn steel" data-test="dev-events" @onclick="DevEvents">Anticipa eventi</button>
+                    <button class="btn steel" data-test="dev-phase" @onclick="DevNextPhase">Vai alla fase successiva</button>
+                    <button class="btn steel" data-test="dev-crate" @onclick="DevCrate">+1 cassa</button>
+                    <button class="btn steel" @onclick="DevCycleAd">Annuncio simulato: @Host.MockAds.Behavior</button>
+                    <pre class="log">@string.Join("\n", Host.DebugAnalytics?.Records.Reverse().Take(12).Select(r => r.ToString()) ?? Array.Empty<string>())</pre>
+                </div>
+            }
+        </div>;
+
+    // ===================================================================== offline modal
+    RenderFragment OfflineModal() =>
+        @<div class="modal-backdrop">
+            <div class="modal" role="dialog" aria-modal="true" data-test="offline-modal">
+                @{ var p = S.Offline.Pending; }
+                <h2>@Loc.T("offline.title")</h2>
+                <p>@Loc.T("offline.away", Fmt.Time(p.Seconds))@(p.HitCap ? " · " + Loc.T("offline.cap", Fmt.Time(S.Production.OfflineMaxSeconds)) : "")</p>
+                <p class="big">@Loc.T("offline.base", Fmt.Cr(p.Base))</p>
+                <button class="btn good" data-test="offline-claim" @onclick="ClaimOffline">
+                    @(p.BonusGranted ? Loc.T("offline.claim_bonus", Fmt.Cr(p.Base + p.Bonus)) : Loc.T("offline.claim", Fmt.Cr(p.Base)))
+                </button>
+                @if (Host.AdsAvailable)
+                {
+                    if (p.BonusGranted)
+                    {
+                        <p class="hint">@Loc.T("offline.ad_done")</p>
+                    }
+                    else
+                    {
+                        var can = S.Monetization.CanOfferOfflineBonus();
+                        if (can == AdFailReason.None && !_offerShownLogged) { _offerShownLogged = true; S.Monetization.NotifyOfferShown(MonetizationService.PlacementOffline); }
+                        <button class="btn steel" data-test="offline-ad" disabled="@(can != AdFailReason.None)" @onclick="OfflineAd">@Loc.T("offline.ad", Fmt.Cr(p.Bonus))</button>
+                        <p class="hint">@(!string.IsNullOrEmpty(_offAdMessage) ? _offAdMessage : can == AdFailReason.None ? Loc.T("offline.ad_note") : AdReasonText(can))</p>
+                    }
+                }
+            </div>
+        </div>;
+}

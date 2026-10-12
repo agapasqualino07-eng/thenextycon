@@ -48,7 +48,7 @@ namespace OfficinaTycoon
             if (t == typeof(string)) return node as string ?? (node == null ? null : Convert.ToString(node, System.Globalization.CultureInfo.InvariantCulture));
             if (t == typeof(bool)) return node is bool b ? b : false;
             if (t == typeof(int)) return (int)Math.Max(int.MinValue, Math.Min(int.MaxValue, ToDouble(node)));
-            if (t == typeof(long)) return node is long l ? l : (long)ToDouble(node);
+            if (t == typeof(long)) return node is long l ? l : SaturatingLong(ToDouble(node));
             if (t == typeof(ulong)) return node is ulong ul ? ul : (node is long ll && ll >= 0 ? (ulong)ll : 0UL);
             if (t == typeof(double)) return Num.Sanitize(ToDouble(node));
             if (t == typeof(float)) return (float)Num.Sanitize(ToDouble(node));
@@ -78,6 +78,14 @@ namespace OfficinaTycoon
                 }
             }
             return target;
+        }
+
+        static long SaturatingLong(double d)
+        {
+            if (!Num.IsFinite(d)) return 0;
+            if (d >= long.MaxValue) return long.MaxValue;
+            if (d <= long.MinValue) return long.MinValue;
+            return (long)d;
         }
 
         static double ToDouble(object n)

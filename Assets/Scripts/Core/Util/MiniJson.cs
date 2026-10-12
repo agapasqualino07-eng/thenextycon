@@ -19,6 +19,8 @@ namespace OfficinaTycoon
     public static class MiniJson
     {
         const int MaxDepth = 64;
+        /// <summary>Hard cap on input size: the parser is only used for saves/config, never for large documents.</summary>
+        public const int MaxInputChars = 4_000_000;
 
         // ---------------- Writer ----------------
         public static string Serialize(object tree)
@@ -95,6 +97,7 @@ namespace OfficinaTycoon
         public static object Parse(string json)
         {
             if (json == null) throw new JsonException("null input");
+            if (json.Length > MaxInputChars) throw new JsonException("input too large");
             int pos = 0;
             SkipWs(json, ref pos);
             object v = ReadValue(json, ref pos, 0);

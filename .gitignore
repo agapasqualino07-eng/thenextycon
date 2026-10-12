@@ -23,3 +23,7 @@ TestResults/
 .DS_Store
 .vscode/
 .idea/
+# web
+Web/**/bin/
+Web/**/obj/
+Web/e2e/node_modules/
