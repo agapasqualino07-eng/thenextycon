@@ -1,0 +1,4 @@
+<linker>
+  <!-- Config and save classes are mapped through reflection (JsonMapper). Keep them from being stripped by IL2CPP. -->
+  <assembly fullname="OfficinaTycoon.Core" preserve="all"/>
+</linker>

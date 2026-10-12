@@ -1,0 +1,46 @@
+# Report dei test
+
+Ambiente: container Linux, .NET SDK 8.0.131 (apt), NUnit 3.14, Microsoft.NET.Test.Sdk 17.11.1, C# LangVersion 9 (come Unity 6). **Unity Editor non disponibile.**
+
+## Risultato eseguito
+```
+$ dotnet test Tools/Tests.Dotnet
+Passed!  - Failed: 0, Passed: 177, Skipped: 0, Total: 177, Duration: ~1 s
+```
+I test sono in `Assets/Tests/EditMode` e si compilano **senza modifiche** sia nel progetto .NET sia nell'Unity Test Framework (asmdef Editor-only con `nunit.framework.dll`). La corsa in Unity **non è stata eseguita**.
+
+## Copertura rispetto alla specifica §13
+| Area | Test (file) | Esito |
+|---|---|---|
+| **Economia** — saldo insufficiente, acquisto valido, doppio tap, costo corretto, produzione, nessun saldo negativo, nessun overflow | `EconomyTests` | Passano |
+| **Salvataggi** — salva/carica, dati corrotti (spazzatura, troncati, manomessi), recupero da backup, file .tmp completo/parziale, salvataggio di versione futura, migrazione (con passi sintetici), migrazione mancante/che lancia, valori non validi | `SaveTests` | Passano |
+| **Offline** — formula, limite, upgrade, orologio all'indietro, soglia minima, nessuna produzione, riscossione una volta, offerta persistente al riavvio, ripresa da background, avanzamento timer eventi | `SaveTests` | Passano |
+| **Duplicazione ricompense** — ordine una volta anche dopo ripristino, ledger limitato, RNG persistito | `SaveTests` | Passano |
+| **Eventi casuali** — probabilità valide e somma 100, validatore, esito deterministico (soglie), frequenze empiriche (200k tiri ±0,5 punti), costo una volta, saldo insufficiente, costo mostrato non fidato, rifiuto senza penali, risultato una volta, limite perdita/payout, nessun blocco dopo esito negativo, riavvio durante l'evento (stesso esito, nessun secondo addebito), stati non validi | `RiskRewardTests` | Passano |
+| **Produzione fuori scala** — bonus garantito, esiti deterministici, scelta una volta, scadenza e cooldown, ignora gratis, riavvio, tetto bonus | `RiskRewardTests` | Passano |
+| **Cassa** — nessun acquisto (nessuna API), solo da gioco, premio di fase una volta anche dopo riavvio, probabilità visibili, esiti deterministici, apertura una volta, overflow→Cr, tetto Cr, nessun valore esterno | `RiskRewardTests` | Passano |
+| **Rewarded ads** — completato, non disponibile, errore (SDK/rete/eccezione), chiusura anticipata, richiamata ripetuta, solo-apertura = nessun premio, timeout (+ ricompensa tardiva ignorata), doppio tap, riscossione durante l'annuncio, riavvio durante il flusso, riavvio dopo completamento, cooldown, limite giornaliero (+ riavvio), disattivati, acceleratore, base sempre disponibile, gioco senza annunci, consenso | `RewardedAdTests` | Passano |
+| **Progressione/ordini/config/analytics/sessione** — tutorial, ricompense, scadenze, tipi di ordine, fasi, config round-trip JSON e override parziale, validatore (id duplicati, cicli, riferimenti, overflow), sessione rifiuta config invalida, eventi analytics e assenza di chiavi personali | `ProgressionAndConfigTests` | Passano |
+| **Prestazioni (solo logica)** — 1 h a 60 FPS (216k tick) e avvio sessione | `ProgressionAndConfigTests` | Passano (tripwire di regressione, **non** un benchmark su dispositivo) |
+
+## NON eseguito / non coperto
+- Unity Test Runner (EditMode) e qualunque PlayMode test.
+- **Compilazione del livello Unity in Unity** (UI, bootstrap, audio, Editor, AdMob). `Tools/UnityCompileCheck` dà 0 errori ma con API core 2021.3 da NuGet e **stub scritti a mano** per uGUI: controllo parziale.
+- Prestazioni reali, avvio su dispositivo, cambio schermata, pausa/background reali, risoluzioni diverse, ricerca di riferimenti a oggetti distrutti, pulsanti inattivi. Sono **verifiche manuali** (RELEASE_CHECKLIST §2).
+- Build Android/iOS; SDK pubblicitario; flusso di consenso reale.
+- Nessun test automatico sulla UI.
+
+## Difetti trovati dai test/simulatore durante lo sviluppo (tutti corretti)
+1. Economia iniziale sbilanciata (tutto sbloccato in ~10 min) — trovato dal simulatore; ridisegnata (vedi ECONOMY_BALANCE).
+2. `ConfigValidator` lanciava eccezione con id macchina duplicati — corretto, test aggiunto.
+3. Offerta offline con bonus già ottenuto depositata silenziosamente al riavvio — corretto, test aggiunto.
+4. `ConfigValidator` troppo severo sul costo al livello massimo — soglia sostituita con controllo di finitezza (<1e90).
+5. Diversi errori nei test stessi (helper di riavvio che risalvava l'orologio, aspettative errate): corretti; non erano difetti del gioco.
+
+## Problemi noti ancora aperti
+- Livello Unity non compilato/eseguito in Unity (rischio principale; potrebbe contenere errori di compilazione o di layout).
+- Scena `Main.unity` scritta a mano (se non si carica: Officina → Create Main Scene; il bootstrap si crea comunque da solo).
+- Adattatore AdMob e strumenti Editor non verificati.
+- Consenso reale (UMP) non implementato.
+- Giocare molto non accelera la progressione; il contenuto termina dopo ~30 giorni (ECONOMY_BALANCE).
+- Tasto Indietro Android non gestito; solo lingua italiana; arte/audio segnaposto; specializzazioni non implementate.
