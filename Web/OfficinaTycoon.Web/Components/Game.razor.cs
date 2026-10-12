@@ -155,7 +155,8 @@ namespace OfficinaTycoon.Web.Components
             if (_subscribedTo == S) return;
             _subscribedTo = S;
             S.Signals.MachineLevelChanged += OnMachineLevel;
-            S.Signals.MachineLevelChanged += (id, lvl) => Say(Loc.T(lvl == 1 ? "mascot.new_machine" : "mascot.cheer" + (lvl % 3)), 2.5);
+            S.Signals.MachineLevelChanged += (id, lvl) => Say(lvl == 1 ? Loc.T("mascot.new_machine")
+                : (lvl % 3) switch { 0 => Loc.T("mascot.cheer0"), 1 => Loc.T("mascot.cheer1"), _ => Loc.T("mascot.cheer2") }, 2.5);
             S.Signals.UpgradePurchased += id => { Sfx("upgrade"); Toast(Loc.T("toast.upgrade")); Fx("burstAt", "[data-test='upgrade-" + id + "']", "build"); };
             S.Signals.OrderClaimed += id =>
             {
@@ -390,7 +391,14 @@ namespace OfficinaTycoon.Web.Components
         void ApplyCode(string code)
         {
             var r = S.ApplyReferral(code);
-            _inviteMessage = Loc.T("invite.result_" + r.ToString().ToLowerInvariant());
+            _inviteMessage = r switch
+            {
+                ReferralResult.Ok => Loc.T("invite.result_ok"),
+                ReferralResult.AlreadyUsed => Loc.T("invite.result_alreadyused"),
+                ReferralResult.InvalidCode => Loc.T("invite.result_invalidcode"),
+                ReferralResult.OwnCode => Loc.T("invite.result_owncode"),
+                _ => Loc.T("invite.result_disabled")
+            };
             if (r == ReferralResult.Ok) { Sfx("reward"); Fx("confetti", 90); _codeInput = ""; }
         }
 
