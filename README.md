@@ -7,7 +7,7 @@ comprano e potenziano macchinari, si completano ordini e si reinveste. Offline-f
 La cartella `Web/` contiene la versione **installabile su iPhone** (PWA): la **stessa logica C#** del gioco compilata in WebAssembly,
 con interfaccia mobile, salvataggio sul dispositivo, backup/ripristino e funzionamento offline.
 Istruzioni complete: **[Docs/INSTALL_IPHONE.md](Docs/INSTALL_IPHONE.md)** (pubblicazione con GitHub Pages + "Aggiungi alla schermata Home").
-Verifiche eseguite: 217 test unitari + **10 test end-to-end in un browser reale** (Chromium con schermo e tocco da iPhone) a ogni push via GitHub Actions.
+Verifiche eseguite: 232 test unitari + **16 test end-to-end in un browser reale** (Chromium con schermo e tocco da iPhone) a ogni push via GitHub Actions.
 Sicurezza: [Docs/SECURITY.md](Docs/SECURITY.md).
 
 ```
@@ -37,7 +37,7 @@ cd Web/e2e && npm ci && npx playwright install chromium && \
 ## Come eseguire i test e gli strumenti
 | Cosa | Comando / azione | Note |
 |---|---|---|
-| Test logica (217) | `dotnet test Tools/Tests.Dotnet` | Compila gli **stessi** sorgenti di `Assets/Scripts/Core` e gli **stessi** test di `Assets/Tests/EditMode`. Risultato verificato. |
+| Test logica (232) | `dotnet test Tools/Tests.Dotnet` | Compila gli **stessi** sorgenti di `Assets/Scripts/Core` e gli **stessi** test di `Assets/Tests/EditMode`. Risultato verificato. |
 | Test in Unity | Window → General → Test Runner → EditMode → Run All | **Non eseguito** (nessun Editor disponibile). |
 | Simulatore economia | `dotnet run --project Tools/Simulator -c Release -- 30` | Usa `GameSession` reale. Output in [Docs/ECONOMY_BALANCE.md](Docs/ECONOMY_BALANCE.md). |
 | Controllo compilazione parziale Unity | `dotnet build Tools/UnityCompileCheck` | Vedi limiti sotto. |
@@ -107,7 +107,7 @@ Documenti: [INSTALL_IPHONE](Docs/INSTALL_IPHONE.md) · [SECURITY](Docs/SECURITY.
 | 11 | Rewarded robusto o mock identificato | Mock testato; rete reale assente |
 | 12 | Ricompensa base indipendente dall'annuncio | Testato |
 | 13 | Niente duplicazione ricompense | Testato per le sequenze previste (limite: salvataggio locale non è inviolabile) |
-| 14 | Test automatici passano | **217/217 con dotnet** + 10/10 e2e web; Unity Test Runner non eseguito |
+| 14 | Test automatici passano | **232/232 con dotnet** + 16/16 e2e web; Unity Test Runner non eseguito |
 | 15 | Build verificata | **No** |
 | 16 | Configurazioni e dipendenze documentate | Sì |
 | 17 | Checklist di pubblicazione | Sì |

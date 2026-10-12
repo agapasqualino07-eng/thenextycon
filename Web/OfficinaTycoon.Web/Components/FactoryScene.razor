@@ -1,0 +1,59 @@
+@* The factory floor: one bay per machine (owned = animated, available = silhouette, locked = padlock), a conveyor
+   belt carrying the goods of owned machines, and a backdrop that changes with the progression phase. *@
+<section class="scene p@(S.Progression.PhaseIndex)" aria-label="Fabbrica" data-test="scene">
+    <div class="backdrop" aria-hidden="true">
+        <span class="window w1"></span><span class="window w2"></span><span class="window w3"></span>
+        <span class="chimney"><i></i><i></i><i></i></span>
+    </div>
+    <div class="bays">
+        @for (int i = 0; i < S.Config.Machines.Count; i++)
+        {
+            var m = S.Config.Machines[i];
+            string id = m.Id;
+            int lvl = S.Production.Level(m.Id);
+            bool unlocked = S.Production.IsUnlocked(m.Id);
+            bool affordable = unlocked && lvl == 0 && S.Production.MaxAffordableCount(m.Id) > 0;
+            string state = lvl > 0 ? "owned" : unlocked ? "available" : "locked";
+            <button class="bay @state @(affordable ? "ready" : "") @(PopId == id ? "pop" : "")" data-bay="@id" style="--d:@Duration(lvl)"
+                    title="@(unlocked ? m.Name : "???")" @onclick="() => OnBayClick.InvokeAsync(id)">
+                <MachineArt Id="@id" Color="@Colors[i % Colors.Length]" />
+                @if (lvl > 0) { <span class="lvl">@lvl</span> }
+                else if (!unlocked) { <span class="lock" aria-label="bloccato"></span> }
+                else { <span class="plus">+</span> }
+            </button>
+        }
+    </div>
+    <div class="belt" aria-hidden="true">
+        @{ int k = 0; }
+        @for (int i = 0; i < S.Config.Machines.Count; i++)
+        {
+            if (S.Production.Level(S.Config.Machines[i].Id) <= 0) continue;
+            for (int j = 0; j < 2; j++)
+            {
+                <span class="item" style="--c:@Colors[i % Colors.Length];--delay:-@((k * 0.9).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))s;--belt:@BeltSpeed()"></span>
+                k++;
+            }
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter] public GameSession S { get; set; }
+    [Parameter] public string[] Colors { get; set; }
+    [Parameter] public string PopId { get; set; }
+    [Parameter] public EventCallback<string> OnBayClick { get; set; }
+
+    // Animation period gets shorter as the machine levels up (faster, busier factory).
+    static string Duration(int lvl)
+    {
+        double d = lvl <= 0 ? 2.2 : Math.Clamp(2.2 - 0.3 * Math.Log2(1 + lvl), 0.35, 2.2);
+        return d.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "s";
+    }
+
+    string BeltSpeed()
+    {
+        double ops = S.Production.OutputPerSecond;
+        double s = Math.Clamp(9 - Math.Log10(1 + ops), 3.5, 9);
+        return s.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "s";
+    }
+}

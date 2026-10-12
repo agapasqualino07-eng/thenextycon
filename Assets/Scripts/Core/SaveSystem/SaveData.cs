@@ -25,6 +25,7 @@ namespace OfficinaTycoon
         public CrateSave Crate = new CrateSave();
         public OfflineSave Offline = new OfflineSave();
         public AdSave Ads = new AdSave();
+        public DailySave Daily = new DailySave();
         public List<string> Claimed = new List<string>();
         public SettingsSave Settings = new SettingsSave();
         public StatsSave Stats = new StatsSave();
@@ -115,6 +116,15 @@ namespace OfficinaTycoon
     }
 
     [Serializable]
+    public class DailySave
+    {
+        public int LastDay = -1;         // day number (UTC) of the last claim; only ever increases
+        public int Index = 0;            // position in the 7-day calendar
+        public int Claims = 0;
+        public bool BonusGranted = false; // ad bonus earned for the pending gift (Claims+1)
+    }
+
+    [Serializable]
     public class SettingsSave
     {
         public bool SfxOn = true;
@@ -125,6 +135,7 @@ namespace OfficinaTycoon
         public bool AdsOptOut = false;         // player chose "no ads": no ad is ever requested
         public bool PrivacyAccepted = false;
         public bool DevShowAnalytics = false;
+        public bool ReducedEffects = false;    // fewer particles/animations (also honoured: OS 'reduce motion')
     }
 
     [Serializable]

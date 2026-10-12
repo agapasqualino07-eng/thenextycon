@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — Grafica e coinvolgimento
+### Aggiunto
+- Fabbrica 2D animata con illustrazioni di tutti gli 8 macchinari (animazioni più veloci al crescere del livello), nastro trasportatore con i prodotti, sfondo che cambia per fase; illustrazioni anche nelle liste e nella festa di nuova fase.
+- Effetti: scintille e monete al tocco, banco con martello, monete che volano al saldo, saldo che scorre, coriandoli, banner ai traguardi di livello, apertura animata della cassa, bagliore durante la Frenesia. Impostazione "Effetti visivi: ridotti" e rispetto di "riduci movimento".
+- Meccaniche (logica condivisa, testata): **Frenesia** (tocchi rapidi → x2 per 12 s, anche sui tocchi) e **Regalo giornaliero** (7 giorni, nessun azzeramento, raddoppio facoltativo con video `daily_bonus`).
+- Obiettivo sempre visibile con riscossione in un tocco; popup di nuova fase.
+- 15 test unitari (232 totali) e 6 test nel browser (16 totali), incluso un controllo di fluidità (nessun blocco lungo del thread principale).
+### Modificato
+- Il valore del tocco beneficia dei bonus temporanei.
+
 ## 0.2.0 — Web app per iPhone (non ancora pubblicata)
 ### Aggiunto
 - `Web/OfficinaTycoon.Web`: web app installabile (PWA, Blazor WebAssembly) che usa la stessa logica di `Assets/Scripts/Core`; interfaccia mobile completa (macchine, upgrade e revisioni, ordini, eventi, cassa, impostazioni), popup offline, istruzioni "Aggiungi alla schermata Home", funzionamento offline (service worker), salvataggio in `localStorage`, **backup/ripristino** con codice validato, Content-Security-Policy, nessuna pubblicità né raccolta dati.

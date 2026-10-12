@@ -29,6 +29,8 @@ namespace OfficinaTycoon
         public readonly RewardedAdController Ads;
         public readonly MonetizationService Monetization;
         public readonly SaveManager Saves;
+        public readonly FrenzySystem Frenzy;
+        public readonly DailyRewardSystem Daily;
 
         public SettingsSave Settings = new SettingsSave();
         public StatsSave Stats = new StatsSave();
@@ -36,6 +38,7 @@ namespace OfficinaTycoon
         public bool Started { get; private set; }
 
         double _autosave;
+        double _dailyCheck;
         double _sessionSeconds;
         bool _tutorialReported;
         readonly IRandom _externalRng;
@@ -69,6 +72,9 @@ namespace OfficinaTycoon
             Ads = new RewardedAdController(config.Ads, adService, clock, Analytics);
             Monetization = new MonetizationService(config, Ads, Offline, Production, Ledger, Analytics);
             Saves = new SaveManager(storage, migrator);
+            Frenzy = new FrenzySystem(config, Production, Signals);
+            Daily = new DailyRewardSystem(config, Wallet, Production, Crates, Ledger, clock);
+            Monetization.AttachDaily(Daily);
             WireAnalytics();
         }
 
@@ -82,6 +88,7 @@ namespace OfficinaTycoon
             if (Stats.InstallTicks == 0) Stats.InstallTicks = now.Ticks;
             Stats.Sessions++;
             Offline.CheckOffline(now, AdvanceWorld);
+            Daily.Check();
             Progression.Update();
             Orders.Update(0);
             Started = true;
@@ -103,6 +110,9 @@ namespace OfficinaTycoon
             Experimental.Advance(dt);
             Surge.Advance(dt);
             Ads.Tick(dt);
+            Frenzy.Tick(dt);
+            _dailyCheck += dt;
+            if (_dailyCheck >= 30) { _dailyCheck = 0; Daily.Check(); }
             Stats.SecondsPlayed += dt;
             _sessionSeconds += dt;
             ReportTutorial();
@@ -122,6 +132,7 @@ namespace OfficinaTycoon
         {
             if (!Started) return;
             Offline.CheckOffline(Clock.UtcNow, AdvanceWorld);
+            Daily.Check();
             Progression.Update();
             Orders.Update(0);
         }
@@ -158,6 +169,7 @@ namespace OfficinaTycoon
                 Crate = Crates.Capture(),
                 Offline = Offline.Capture(),
                 Ads = Ads.Capture(Monetization.BoostSeq),
+                Daily = Daily.Capture(),
                 Claimed = Ledger.Snapshot(),
                 Settings = Settings,
                 Stats = Stats
@@ -183,6 +195,7 @@ namespace OfficinaTycoon
             Offline.Restore(d.Offline);
             Ads.Restore(d.Ads);
             Monetization.Restore(d.Ads.BoostSeq);
+            Daily.Restore(d.Daily);
             Settings = d.Settings ?? new SettingsSave();
             Stats = d.Stats ?? new StatsSave();
             if (_externalRng == null && d.RngState != 0) Rng.State = d.RngState;
@@ -203,6 +216,7 @@ namespace OfficinaTycoon
             Signals.UpgradePurchased += id => Analytics.Track(AnalyticsEvents.UpgradePurchased, AnalyticsParams.Of("upgrade_id", id));
             Signals.OrderClaimed += id => Analytics.Track(AnalyticsEvents.OrderCompleted, AnalyticsParams.Of("order_id", id));
             Signals.CrateOpened += id => Analytics.Track(AnalyticsEvents.FreeCrateOpened, AnalyticsParams.Of("entry_id", id));
+            Frenzy.Triggered += () => Analytics.Track(AnalyticsEvents.FrenzyTriggered);
 
             Experimental.Offered += () => { Stats.RiskShown++; Analytics.Track(AnalyticsEvents.RiskEventShown, AnalyticsParams.Of("type", "experimental")); };
             Experimental.Accepted += (c, cost) => Analytics.Track(AnalyticsEvents.RiskEventAccepted, AnalyticsParams.Of("type", "experimental", "choice", c.ToString()));
@@ -232,5 +246,17 @@ namespace OfficinaTycoon
         }
 
         public void DeclineExperimental() { Experimental.TryDecline(); Save(); }
+
+        /// <summary>Claims today's gift (doubled if the optional ad bonus was earned). Always available without ads.</summary>
+        public bool ClaimDaily()
+        {
+            var p = Daily.Pending;
+            if (p == null) return false;
+            int day = p.DayIndex; bool bonus = p.BonusGranted;
+            bool ok = Daily.TryClaim();
+            if (ok) Analytics.Track(AnalyticsEvents.DailyRewardClaimed, AnalyticsParams.Of("day", day + 1, "with_bonus", bonus));
+            Save();
+            return ok;
+        }
     }
 }

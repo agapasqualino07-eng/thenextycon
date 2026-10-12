@@ -28,7 +28,7 @@ namespace OfficinaTycoon.Web.Services
         public bool AdsAvailable => Session != null && Session.Config.Ads.Enabled;
         public string Version => typeof(GameHost).Assembly.GetName().Version?.ToString(3) ?? "?";
 
-        /// <summary>Raised ~5 times per second and after lifecycle changes, so the UI can re-render.</summary>
+        /// <summary>Raised ~10 times per second and after lifecycle changes, so the UI can re-render.</summary>
         public event Action Changed;
         /// <summary>Raised when the app becomes visible again (the UI shows the offline popup if any).</summary>
         public event Action Resumed;
@@ -82,7 +82,7 @@ namespace OfficinaTycoon.Web.Services
                 // the absence is paid by the offline system on return (no double counting).
                 if (!_hidden && Session != null) Session.Update(dt);
                 _uiAccumulator += dt;
-                if (_uiAccumulator >= 0.2)
+                if (_uiAccumulator >= 0.1)
                 {
                     _uiAccumulator = 0;
                     Changed?.Invoke();

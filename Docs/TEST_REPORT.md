@@ -2,7 +2,10 @@
 
 Ambiente: container Linux, .NET SDK 8.0.131 (apt), NUnit 3.14, Microsoft.NET.Test.Sdk 17.11.1, C# LangVersion 9 (come Unity 6). **Unity Editor non disponibile.**
 
-## Risultato eseguito (aggiornato alla 0.2.0)
+## Risultato eseguito (aggiornato alla 0.3.0: 232 unitari, 16 nel browser)
+In 0.3.0 si aggiungono `EngagementTests` (Frenesia, regalo giornaliero: orologio, riavvii, bonus video una sola volta, nessun azzeramento) e 6 test nel browser: scena animata, Frenesia, regalo giornaliero, traguardo di livello e nuova fase, effetti ridotti, fluidità (task più lungo del thread principale < 250 ms su Chromium desktop: indicativo, non una misura su iPhone).
+
+### Risultati 0.2.0
 ```
 $ dotnet test Tools/Tests.Dotnet -c Release
 Passed!  - Failed: 0, Passed: 217, Skipped: 0, Total: 217, Duration: ~1 s

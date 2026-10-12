@@ -14,12 +14,19 @@ Esiste l'architettura completa e un mock; **nessuna rete pubblicitaria reale è 
 |---|---|---|
 | `offline_bonus` | + `AdBonusFraction` × ricompensa offline | 1 per offerta |
 | `production_boost` | ×2 produzione per 300 s | non richiedibile se resta più di 30 s di acceleratore da video |
+| `daily_bonus` | regalo giornaliero raddoppiato | 1 per regalo |
 Globali: min 120 s tra due annunci, max 8 al giorno, timeout 120 s. Tutto modificabile in `AdsConfig`.
 
 ## Flusso e robustezza (testati con mock)
 1. Calcolo e persistenza dell'offerta offline. 2. Si mostra la ricompensa base. 3. L'annuncio è facoltativo. 4. Conferma = `OnRewardEarned` del tentativo **corrente**. 5. `GrantBonus` una sola volta (ledger), poi `ClaimOffline`.
 
 Gestiti: annuncio non disponibile · errore di rete (segnalato dall'SDK) · chiusura anticipata (nessun bonus) · richiamate ripetute o tardive (ignorate) · timeout · doppio tap (`Busy`) · riavvio durante il flusso (nessun tentativo sopravvive: nessun bonus, base riscuotibile) · riscossione della base mentre l'annuncio è aperto (il bonus non viene assegnato a un'offerta già chiusa) · eccezione sincrona dell'SDK (trattata come fallimento) · limiti di frequenza e giornalieri (persistiti).
+
+## Video interi senza trucchi
+I video si guardano per intero perché il premio arriva **solo** a video completato e viene dichiarato prima (es. "Raddoppia con un video"). Non si usano: pulsanti di chiusura nascosti o finti, annunci non richiesti, timer ingannevoli, premi tolti a chi non guarda. Oltre che scorretti, sono vietati dalle policy di AdMob, Google Play e App Store e portano a sospensione dell'account o rimozione dell'app.
+
+## Pubblicità nella versione web
+La web app oggi **non ha pubblicità**. Le strade possibili: (1) app nativa (Unity, AdMob) — richiede Mac/Xcode per iOS; (2) annunci per giochi web di Google (Ad Placement API / H5 Games Ads, tramite AdSense), soggetti ad approvazione dell'account e del sito: andrà aggiunta un'implementazione di `IRewardedAdService` che usa quella API e aggiornata la CSP con le origini del fornitore. Nessuna delle due è implementata.
 
 ## Integrare AdMob (da fare, **non verificato**)
 1. Importare il Google Mobile Ads Unity plugin compatibile con la versione di Unity (verificare la versione e le dipendenze Android/iOS al momento, es. External Dependency Manager).

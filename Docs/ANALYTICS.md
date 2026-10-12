@@ -24,6 +24,8 @@ Le chiavi di parametro tipicamente personali (`email`, `user_id`, `device_id`, `
 | `rewarded_ad_completed` | ricompensa confermata | `placement` |
 | `rewarded_ad_failed` | errore/chiusura anticipata/timeout | `placement`, `reason` |
 | `bonus_granted` | bonus assegnato (una volta) | `type` |
+| `daily_reward_claimed` | regalo giornaliero riscosso | `day`, `with_bonus` |
+| `frenzy_triggered` | Frenesia attivata | — |
 Nota: `risk_event_shown` per il Surge è emesso alla comparsa dell'offerta, non alla visualizzazione della schermata.
 
 ## Metriche da ricavare (richiedono un backend di analytics non incluso)

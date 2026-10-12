@@ -10,6 +10,7 @@ namespace OfficinaTycoon
     {
         public const string PlacementOffline = "offline_bonus";
         public const string PlacementBoost = "production_boost";
+        public const string PlacementDaily = "daily_bonus";
 
         readonly GameConfig _cfg;
         readonly RewardedAdController _ads;
@@ -20,10 +21,35 @@ namespace OfficinaTycoon
 
         public int BoostSeq { get; private set; }
 
+        DailyRewardSystem _daily;
+
         public MonetizationService(GameConfig cfg, RewardedAdController ads, OfflineRewardSystem offline, ProductionSystem production,
                                    ClaimLedger ledger, IAnalyticsService analytics)
         {
             _cfg = cfg; _ads = ads; _offline = offline; _production = production; _ledger = ledger; _analytics = analytics;
+        }
+
+        public void AttachDaily(DailyRewardSystem daily) { _daily = daily; }
+
+        public AdFailReason CanOfferDailyBonus()
+        {
+            var p = _daily?.Pending;
+            if (p == null || p.BonusGranted || _cfg.Daily.AdBonusMultiplier <= 0) return AdFailReason.Busy;
+            return _ads.CanRequest();
+        }
+
+        /// <summary>Optional ad that doubles today's gift. onDone(true) only after a confirmed completion and a first-time grant.</summary>
+        public AdFailReason RequestDailyBonus(Action<bool, AdFailReason> onDone)
+        {
+            var p = _daily?.Pending;
+            if (p == null || p.BonusGranted) return AdFailReason.Busy;
+            int id = p.Id;
+            return _ads.Request(PlacementDaily, r =>
+            {
+                bool granted = r.Completed && _daily.Pending != null && _daily.Pending.Id == id && _daily.GrantBonus();
+                if (granted) _analytics.Track(AnalyticsEvents.BonusGranted, AnalyticsParams.Of("type", "daily_bonus"));
+                onDone?.Invoke(granted, r.Reason);
+            });
         }
 
         public void Restore(int boostSeq) { BoostSeq = Math.Max(0, boostSeq); }

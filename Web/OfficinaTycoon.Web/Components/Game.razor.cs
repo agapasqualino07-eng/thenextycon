@@ -1,6 +1,7 @@
 using OfficinaTycoon.UnityLayer;
 using System.Text;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
 namespace OfficinaTycoon.Web.Components
@@ -14,7 +15,6 @@ namespace OfficinaTycoon.Web.Components
         enum Tab { Factory, Upgrades, Orders, Events, Settings }
 
         static readonly string[] MachineColors = { "#ffaa28", "#5aa0e6", "#6ec878", "#3cbebe", "#aa78e6", "#e65a50", "#ebd250", "#78dcf5" };
-        static readonly Dictionary<int, string> GearCache = new Dictionary<int, string>();
 
         GameSession S => Host.Session;
         IJSInProcessRuntime Js => (IJSInProcessRuntime)JS;
@@ -35,6 +35,21 @@ namespace OfficinaTycoon.Web.Components
         string _importText = "";
         string _importMessage = "";
 
+        // visual effects / engagement UI state
+        double _shownBalance;
+        string _popId;
+        DateTime _popUntil;
+        bool _hit;
+        string _banner;
+        DateTime _bannerUntil;
+        bool _showDaily;
+        bool _dailyAutoShown;
+        int _phaseModal = -1;
+        string _scrollTarget;
+        readonly Dictionary<string, int> _lastLevels = new Dictionary<string, int>();
+        sealed class CrateReveal { public string Text; public bool Rare; }
+        CrateReveal _crateReveal;
+
         // floating "+N" texts on the tap button
         sealed class Floater { public int Id; public string Text; public int X; public DateTime Born; }
         readonly List<Floater> _floaters = new List<Floater>();
@@ -53,6 +68,7 @@ namespace OfficinaTycoon.Web.Components
             Host.Changed += OnHostChanged;
             Host.Resumed += OnResumed;
             Subscribe();
+            ResetVisualState();
             var st = S.LastLoad != null ? S.LastLoad.Status : LoadStatus.NewGame;
             if (st == LoadStatus.CorruptStartedNew) Toast(Loc.T("toast.load_corrupt"));
             else if (st == LoadStatus.TooNewStartedNew) Toast(Loc.T("toast.load_newer"));
@@ -60,6 +76,36 @@ namespace OfficinaTycoon.Web.Components
             if (S.Offline.ClockAnomaly) Toast(Loc.T("offline.anomaly"));
             _showInstallHint = Js.Invoke<bool>("officina.isIos") && !Js.Invoke<bool>("officina.isStandalone") && !S.Settings.PrivacyAccepted;
             if (_showInstallHint) { S.Settings.PrivacyAccepted = true; S.Save(); }   // shown once
+            MaybeAutoDaily();
+        }
+
+        void ResetVisualState()
+        {
+            _shownBalance = S.Wallet.Balance;
+            _lastLevels.Clear();
+            foreach (var m in S.Config.Machines) _lastLevels[m.Id] = S.Production.Level(m.Id);
+            Js.InvokeVoid("officinaFx.setEnabled", !S.Settings.ReducedEffects);
+        }
+
+        /// <summary>The daily gift pops up by itself only at app start/resume and only after the tutorial (never mid-action).</summary>
+        void MaybeAutoDaily()
+        {
+            if (_dailyAutoShown || S.Daily.Pending == null || !S.Orders.TutorialCompleted) return;
+            _dailyAutoShown = true;
+            _showDaily = true;
+        }
+
+        void Fx(string fn, params object[] args)
+        {
+            if (S == null || S.Settings.ReducedEffects) return;
+            Js.InvokeVoid("officinaFx." + fn, args);
+        }
+
+        void Banner(string text) { _banner = text; _bannerUntil = DateTime.UtcNow.AddSeconds(2.6); }
+
+        protected override void OnAfterRender(bool firstRender)
+        {
+            if (_scrollTarget != null) { Js.InvokeVoid("officinaFx.scrollTo", _scrollTarget); _scrollTarget = null; }
         }
 
         GameSession _subscribedTo;
@@ -67,18 +113,51 @@ namespace OfficinaTycoon.Web.Components
         {
             if (_subscribedTo == S) return;
             _subscribedTo = S;
-            S.Signals.MachineLevelChanged += (id, lvl) => Sfx(lvl == 1 ? "unlock" : "buy");
-            S.Signals.UpgradePurchased += id => { Sfx("upgrade"); Toast(Loc.T("toast.upgrade")); };
-            S.Signals.OrderClaimed += id => { Sfx("order"); Toast(Loc.T("toast.order_done")); };
-            S.Signals.PhaseChanged += p => { Sfx("unlock"); Toast(Loc.T("toast.phase", S.Progression.Phase.Name)); };
+            S.Signals.MachineLevelChanged += OnMachineLevel;
+            S.Signals.UpgradePurchased += id => { Sfx("upgrade"); Toast(Loc.T("toast.upgrade")); Fx("burstAt", "[data-test='upgrade-" + id + "']", "build"); };
+            S.Signals.OrderClaimed += id =>
+            {
+                Sfx("order"); Toast(Loc.T("toast.order_done"));
+                Fx("flyCoins", _tab == Tab.Orders ? "[data-test='order-" + id + "']" : "[data-test='goal']", "[data-test='balance']", 12);
+                Fx("confetti", 45);
+            };
+            S.Signals.PhaseChanged += p => { Sfx("unlock"); _phaseModal = p; Fx("confetti", 160); };
+            S.Frenzy.Triggered += () =>
+            {
+                Sfx("unlock");
+                Banner(Loc.T("frenzy.banner", Fmt.Mult(S.Config.Frenzy.Multiplier)));
+                Fx("flash");
+                Fx("burstAt", "[data-test='tap']", "frenzy");
+            };
             S.Signals.Toast += key => Toast(Loc.T(key));
             S.Crates.Granted += (n, src) => { if (n > 0) Toast(Loc.T("toast.crate_earned")); };
+        }
+
+        void OnMachineLevel(string id, int lvl)
+        {
+            _lastLevels.TryGetValue(id, out int before);
+            _lastLevels[id] = lvl;
+            Sfx(lvl == 1 ? "unlock" : "buy");
+            _popId = id; _popUntil = DateTime.UtcNow.AddSeconds(0.45);
+            Fx("burstAt", "[data-bay='" + id + "']", "build");
+            int every = S.Config.Economy.MilestoneEvery;
+            if (every > 0 && lvl / every > before / every)
+            {
+                var def = S.Config.Machines.First(m => m.Id == id);
+                Banner(Loc.T("milestone.banner", def.Name, (lvl / every) * every));
+                Fx("confetti", 70);
+            }
         }
 
         void OnHostChanged()
         {
             Subscribe();   // after import/reset a new session exists
             var now = DateTime.UtcNow;
+            // Balance "rolls" towards the real value (spending snaps immediately: never show more than you have).
+            double target = S.Wallet.Balance;
+            if (target <= _shownBalance || Math.Abs(target - _shownBalance) <= Math.Max(1, target * 0.002)) _shownBalance = target;
+            else _shownBalance += (target - _shownBalance) * 0.35;
+            if (_banner != null && now >= _bannerUntil) _banner = null;
             _floaters.RemoveAll(f => (now - f.Born).TotalSeconds > 1.0);
             if (_toast != null && now >= _toastUntil) _toast = null;
             if (_toast == null && _toastQueue.Count > 0) { _toast = _toastQueue.Dequeue(); _toastUntil = now.AddSeconds(2.4); }
@@ -86,7 +165,7 @@ namespace OfficinaTycoon.Web.Components
             InvokeAsync(StateHasChanged);
         }
 
-        void OnResumed() { _showOffline = true; _offAdMessage = ""; _offerShownLogged = false; }
+        void OnResumed() { _showOffline = true; _offAdMessage = ""; _offerShownLogged = false; _dailyAutoShown = false; MaybeAutoDaily(); }
 
         public void Dispose()
         {
@@ -107,35 +186,6 @@ namespace OfficinaTycoon.Web.Components
         void Arm(string key) { _armedKey = key; _armedUntil = DateTime.UtcNow.AddSeconds(4); }
 
         static string Pct(double v) => (Math.Clamp(v, 0, 1) * 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
-
-        static string GearPath(int teeth)
-        {
-            lock (GearCache)
-            {
-                if (GearCache.TryGetValue(teeth, out var p)) return p;
-                var sb = new StringBuilder();
-                var inv = System.Globalization.CultureInfo.InvariantCulture;
-                int steps = teeth * 4;
-                for (int k = 0; k < steps; k++)
-                {
-                    double a = 2 * Math.PI * k / steps;
-                    double r = (k % 4 == 0 || k % 4 == 1) ? 48 : 38;   // tooth top / root
-                    double a2 = a + (k % 4 == 1 || k % 4 == 3 ? -0.08 : 0.08);
-                    sb.Append(k == 0 ? "M" : "L").Append((r * Math.Cos(a2)).ToString("0.##", inv)).Append(',').Append((r * Math.Sin(a2)).ToString("0.##", inv));
-                }
-                sb.Append("Z M14,0 A14,14 0 1,0 -14,0 A14,14 0 1,0 14,0 Z");   // centre hole
-                p = sb.ToString();
-                GearCache[teeth] = p;
-                return p;
-            }
-        }
-
-        static string GearStyle(int i, int lvl)
-        {
-            if (lvl <= 0) return "animation:none";
-            double degPerSec = Math.Min(120, 18 + 10 * Math.Log2(1 + lvl));
-            return "animation-duration:" + (360 / degPerSec).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "s";
-        }
 
         string BoostText()
         {
@@ -165,10 +215,12 @@ namespace OfficinaTycoon.Web.Components
         }
 
         // ------------------------------------------------------------ actions
-        void OnTap()
+        void OnTap(MouseEventArgs e)
         {
             double got = S.Production.Tap();
             Sfx("tap");
+            _hit = !_hit;
+            if (e != null && (e.ClientX > 0 || e.ClientY > 0)) Fx("burst", e.ClientX, e.ClientY, "tap");
             if (_floaters.Count < 12)
                 _floaters.Add(new Floater { Id = ++_floaterId, Text = Fmt.Num(got), X = _rnd.Next(10, 85), Born = DateTime.UtcNow });
         }
@@ -206,6 +258,62 @@ namespace OfficinaTycoon.Web.Components
             if (S.Orders.TryClaim(id)) S.Save();
         }
 
+        void OnGoalClick(string id, bool done)
+        {
+            if (done) ClaimOrder(id);
+            else SwitchTab(Tab.Orders);
+        }
+
+        void OnBayClick(string id)
+        {
+            SwitchTab(Tab.Factory);
+            _scrollTarget = "[data-test='machine-" + id + "']";
+        }
+
+        // ---- daily gift
+        void OpenDaily() { _showDaily = true; }
+
+        string DailyText(DailyRewardDef d)
+        {
+            switch (d.Kind)
+            {
+                case DailyRewardKind.Currency: return Fmt.Cr(S.Daily.CurrencyValue(d));
+                case DailyRewardKind.Crate: return Loc.T(d.Amount == 1 ? "daily.crate" : "daily.crates", d.Amount);
+                default: return Loc.T("daily.parts", d.Amount);
+            }
+        }
+
+        void ClaimDaily()
+        {
+            var def = S.Daily.Pending?.Def;
+            Fx("flyCoins", "#daily-claim", "[data-test='balance']", 14);
+            if (S.ClaimDaily())
+            {
+                Sfx("reward");
+                Fx("confetti", def != null && def.Kind == DailyRewardKind.Crate ? 120 : 60);
+                _showDaily = false;
+            }
+        }
+
+        void DailyAd()
+        {
+            var r = S.Monetization.RequestDailyBonus((granted, reason) =>
+            {
+                if (granted) { Sfx("reward"); Fx("confetti", 40); }
+                else Toast(AdReasonText(reason == AdFailReason.None ? AdFailReason.Error : reason));
+            });
+            if (r != AdFailReason.None) Toast(AdReasonText(r));
+        }
+
+        string CrateGlow() => _crateReveal != null && _crateReveal.Rare ? "#ffd27a66" : "#78dcf533";
+
+        void ToggleEffects()
+        {
+            S.Settings.ReducedEffects = !S.Settings.ReducedEffects;
+            Js.InvokeVoid("officinaFx.setEnabled", !S.Settings.ReducedEffects);
+            S.Save();
+        }
+
         void ExpAccept(ExperimentChoice c)
         {
             var pv = S.Experimental.GetPreview();
@@ -238,11 +346,23 @@ namespace OfficinaTycoon.Web.Components
                 case CrateRewardKind.TempBoost: _crateResult = Loc.T("crate.result_boost", Fmt.Mult(r.BoostMultiplier), Fmt.Time(r.BoostSeconds)); break;
                 case CrateRewardKind.Parts: _crateResult = Loc.T("crate.result_parts", r.Parts); break;
             }
+            // Rarity shown is the real one from the displayed odds (no fake "almost won" effects).
+            double pct = S.Config.Crate.Entries.First(x => x.Id == r.EntryId).ProbabilityPercent;
+            _crateReveal = new CrateReveal { Text = _crateResult, Rare = pct <= 5 };
             S.Save();
+            _ = CelebrateCrate(_crateReveal.Rare);
+        }
+
+        async Task CelebrateCrate(bool rare)
+        {
+            await Task.Delay(950);   // after the lid animation
+            Fx("burstAt", ".crate-art", "build");
+            if (rare) Fx("confetti", 120);
         }
 
         void ClaimOffline()
         {
+            Fx("flyCoins", "[data-test='offline-claim']", "[data-test='balance']", 16);
             double got = S.ClaimOffline();
             if (got > 0) { Sfx("reward"); Toast("+" + Fmt.Cr(got)); }
         }

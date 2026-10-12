@@ -23,6 +23,8 @@ namespace OfficinaTycoon
         public const string RewardedAdCompleted = "rewarded_ad_completed";
         public const string RewardedAdFailed = "rewarded_ad_failed";
         public const string BonusGranted = "bonus_granted";
+        public const string DailyRewardClaimed = "daily_reward_claimed";
+        public const string FrenzyTriggered = "frenzy_triggered";
     }
 
     /// <summary>

@@ -49,6 +49,14 @@ Fase 2, offerta valida 300 s (se ignorata scade, nessuna penale), cooldown 1500 
 ### D — Offline + rewarded
 Vedi [MONETIZATION](MONETIZATION.md).
 
+## Coinvolgimento e grafica (0.3.0, versione web)
+- **Fabbrica 2D animata**: ogni macchinario ha un'illustrazione propria (trapano che fora, tornio e fresa che girano, CNC con spia e utensile, pressa che stampa, braccio robotico che salda, linea con nastro e carrelli, fabbrica intelligente con finestre e drone). Le animazioni accelerano con il livello; le macchine acquistabili pulsano; quelle bloccate sono sagome con lucchetto. Un nastro trasporta i prodotti delle macchine possedute; lo sfondo cambia a ogni fase.
+- **Feedback**: scintille e monete al tocco (martello sul banco), monete che volano verso il saldo alla riscossione, saldo che "scorre", coriandoli per ordini e nuove fasi, banner ai traguardi di livello (ogni 25: produzione x2), apertura animata della cassa (durata fissa; rarità mostrata = rarità reale; nessun effetto "quasi vinto").
+- **Frenesia**: 30 tocchi rapidi (la carica cala di 1,5/s) attivano produzione e tocchi x2 per 12 s. Premia il gioco attivo senza penalizzare chi non tocca.
+- **Regalo giornaliero**: calendario di 7 giorni (Cr, ricambi, casse; casse al giorno 4 e 7). Avanza a ogni giorno di gioco e **non si azzera** se salti giorni (niente pressione). Facoltativo: raddoppio con video premiato.
+- **Obiettivo in vista**: l'ordine più vicino al completamento è sempre mostrato sotto la fabbrica e si riscuote con un tocco.
+- **Accessibilità**: impostazione "Effetti visivi: ridotti" e rispetto dell'opzione di sistema "riduci movimento".
+
 ## Non implementato (dichiarato)
 - **Specializzazioni** della fase avanzata (previste dal brief): oggi la fase avanzata ha solo macchine costose e sinergie.
 - **Prestigio/reset**: l'economia continua a crescere ma il contenuto finisce dopo ~30 giorni (vedi [ECONOMY_BALANCE](ECONOMY_BALANCE.md)).

@@ -105,7 +105,7 @@ namespace OfficinaTycoon
             get
             {
                 Recompute();
-                return (_cfg.Economy.TapBase + _cfg.Economy.TapOpsFraction * _baseOps) * _tapMult;
+                return (_cfg.Economy.TapBase + _cfg.Economy.TapOpsFraction * _baseOps) * _tapMult * TempMultiplier;
             }
         }
 

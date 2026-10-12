@@ -8,35 +8,48 @@
 }
 else
 {
-<div class="app">
+<div class="app @(S.Frenzy.Active ? "in-frenzy" : "")">
     <header class="topbar">
-        <div class="balance" data-test="balance">@Fmt.Cr(S.Wallet.Balance)</div>
+        <div class="balance" data-test="balance">@Fmt.Cr(_shownBalance)</div>
         <div class="ops" data-test="ops">@Loc.T("top.ops", Fmt.Num(S.Production.OutputPerSecond))</div>
         <div class="phase">@Loc.T("top.phase", S.Progression.Phase.Name)</div>
-        <div class="boost">@BoostText()</div>
+        <div class="top-right">
+            @if (S.Daily.Pending != null)
+            {
+                <button class="gift" data-test="daily-open" @onclick="OpenDaily">@Loc.T("daily.pill")</button>
+            }
+            else
+            {
+                <span class="boost">@BoostText()</span>
+            }
+        </div>
         <div class="bar"><div class="fill steel" style="width:@Pct(S.Progression.NextPhaseProgress)"></div></div>
     </header>
 
-    <section class="factory" aria-label="Fabbrica">
-        @for (int i = 0; i < S.Config.Machines.Count; i++)
-        {
-            var m = S.Config.Machines[i];
-            int lvl = S.Production.Level(m.Id);
-            bool unlocked = S.Production.IsUnlocked(m.Id);
-            <div class="tile @(lvl > 0 ? "owned" : unlocked ? "available" : "locked")" title="@m.Name">
-                <svg viewBox="-50 -50 100 100" class="gear @(i % 2 == 0 ? "cw" : "ccw")" style="@GearStyle(i, lvl)" aria-hidden="true">
-                    <path d="@GearPath(6 + i)" fill="@MachineColors[i % MachineColors.Length]" fill-rule="evenodd" />
-                </svg>
-                <span class="lvl">@(lvl > 0 ? lvl.ToString() : unlocked ? "+" : "")</span>
-            </div>
-        }
-    </section>
+    <FactoryScene S="S" Colors="MachineColors" PopId="@(DateTime.UtcNow < _popUntil ? _popId : null)" OnBayClick="OnBayClick" />
 
-    <button class="tap" data-test="tap" @onclick="OnTap">
-        @Loc.T("tap.button") <b>@Loc.T("tap.value", Fmt.Num(S.Production.TapValue))</b>
-        @foreach (var f in _floaters)
+    @GoalChip()
+
+    <button class="tap @(_hit ? "hit-a" : "hit-b") @(S.Frenzy.Active ? "frenzy" : "")" data-test="tap" @onclick="OnTap">
+        <svg class="bench" viewBox="0 0 64 40" aria-hidden="true">
+            <rect x="10" y="26" width="44" height="7" rx="2" fill="#3b2a12" />
+            <path d="M18 26 L22 18 L44 18 L48 26 Z" fill="#5a4a36" />
+            <rect x="28" y="12" width="10" height="6" rx="1" fill="#e6edf3" />
+            <g class="hammer"><rect x="38" y="2" width="4" height="22" rx="1" fill="#7a5230" transform="rotate(35 40 24)" /><rect x="40" y="0" width="14" height="7" rx="1.5" fill="#8fa3b8" transform="rotate(35 40 24)" /></g>
+        </svg>
+        <span class="tap-text">
+            @if (S.Frenzy.Active)
+            {
+                <b>@Loc.T("frenzy.active", Fmt.Mult(S.Config.Frenzy.Multiplier), Fmt.Time(S.Frenzy.ActiveRemaining))</b>
+            }
+            else
+            {
+                @Loc.T("tap.button") <b>@Loc.T("tap.value", Fmt.Num(S.Production.TapValue))</b>
+            }
+        </span>
+        @if (S.Frenzy.Enabled)
         {
-            <span class="floater" style="left:@(f.X)%" @key="f.Id">+@f.Text</span>
+            <span class="frenzy-meter" aria-label="@Loc.T("frenzy.label")"><span class="frenzy-fill" style="width:@Pct(S.Frenzy.Active ? 1 : S.Frenzy.Fill)"></span></span>
         }
     </button>
 
@@ -59,6 +72,10 @@ else
         @NavButton(Tab.Settings, "nav.settings", false)
     </nav>
 
+    @if (_banner != null)
+    {
+        <div class="banner" role="status" data-test="banner">@_banner</div>
+    }
     @if (_toast != null)
     {
         <div class="toast" role="status" data-test="toast">@_toast</div>
@@ -67,6 +84,18 @@ else
     @if (S.Offline.Pending != null && _showOffline)
     {
         @OfflineModal()
+    }
+    else if (_showDaily && S.Daily.Pending != null)
+    {
+        @DailyModal()
+    }
+    else if (_crateReveal != null)
+    {
+        @CrateModal()
+    }
+    else if (_phaseModal >= 0)
+    {
+        @PhaseModal()
     }
 
     @if (_adCallbacks != null)
@@ -127,7 +156,7 @@ else
                 int lvl = S.Production.Level(d.Id);
                 bool unlocked = S.Production.IsUnlocked(d.Id);
                 <div class="row" data-test="@("machine-" + d.Id)">
-                    <svg viewBox="-50 -50 100 100" class="icon @(lvl > 0 ? "" : "dim")" aria-hidden="true"><path d="@GearPath(6 + idx)" fill="@MachineColors[idx % MachineColors.Length]" fill-rule="evenodd" /></svg>
+                    <div class="icon @(lvl > 0 ? "" : "dim")"><MachineArt Id="@d.Id" Color="@MachineColors[idx % MachineColors.Length]" /></div>
                     <div class="info">
                         @if (!unlocked)
                         {
@@ -374,6 +403,7 @@ else
         @<div class="panel">
             <h2>@Loc.T("settings.header")</h2>
             <button class="btn neutral" data-test="toggle-sfx" @onclick="ToggleSfx">@Loc.T("settings.sfx"): @Loc.T(S.Settings.SfxOn ? "settings.on" : "settings.off")</button>
+            <button class="btn neutral" data-test="toggle-effects" @onclick="ToggleEffects">@Loc.T("settings.effects"): @Loc.T(S.Settings.ReducedEffects ? "settings.effects_reduced" : "settings.effects_full")</button>
 
             <div class="card">
                 <h3>@Loc.T("settings.backup")</h3>
@@ -441,6 +471,94 @@ else
                         <p class="hint">@(!string.IsNullOrEmpty(_offAdMessage) ? _offAdMessage : can == AdFailReason.None ? Loc.T("offline.ad_note") : AdReasonText(can))</p>
                     }
                 }
+            </div>
+        </div>;
+
+    // ===================================================================== goal chip
+    RenderFragment GoalChip()
+    {
+        var g = S.Orders.Views().OrderByDescending(v => v.Status == OrderStatus.Completed).ThenByDescending(v => v.Fraction).FirstOrDefault();
+        if (g == null) return @<div class="goal empty"></div>;
+        bool done = g.Status == OrderStatus.Completed;
+        string id = g.Def.Id;
+        return @<button class="goal @(done ? "done" : "")" data-test="goal" @onclick="() => OnGoalClick(id, done)">
+            <span class="goal-label">@(done ? Loc.T("goal.claim") : Loc.T("goal.label"))</span>
+            <span class="goal-title">@g.Def.Title</span>
+            <span class="goal-bar"><span style="width:@Pct(g.Fraction)"></span></span>
+        </button>;
+    }
+
+    // ===================================================================== daily gift
+    RenderFragment DailyModal() =>
+        @<div class="modal-backdrop">
+            <div class="modal daily" role="dialog" aria-modal="true" data-test="daily-modal">
+                @{ var p = S.Daily.Pending; }
+                <h2>@Loc.T("daily.title")</h2>
+                <div class="days">
+                    @for (int i = 0; i < S.Daily.DayCount; i++)
+                    {
+                        var d = S.Daily.DefAt(i);
+                        string cls = i < p.DayIndex ? "past" : i == p.DayIndex ? "today" : "future";
+                        <div class="day @cls">
+                            <small>@Loc.T("daily.day", i + 1)</small>
+                            <span class="ico ico-@d.Kind.ToString().ToLowerInvariant()"></span>
+                            <b>@DailyText(d)</b>
+                        </div>
+                    }
+                </div>
+                <p class="hint">@Loc.T("daily.note")</p>
+                <button class="btn good" data-test="daily-claim" id="daily-claim" @onclick="ClaimDaily">
+                    @(p.BonusGranted ? Loc.T("daily.claim_bonus") : Loc.T("daily.claim")) · @DailyText(p.Def)
+                </button>
+                @if (Host.AdsAvailable && !p.BonusGranted)
+                {
+                    var can = S.Monetization.CanOfferDailyBonus();
+                    <button class="btn steel" data-test="daily-ad" disabled="@(can != AdFailReason.None)" @onclick="DailyAd">@Loc.T("daily.ad")</button>
+                    <p class="hint">@(can == AdFailReason.None ? Loc.T("offline.ad_note") : AdReasonText(can))</p>
+                }
+                else if (p.BonusGranted)
+                {
+                    <p class="hint accent">@Loc.T("daily.done")</p>
+                }
+                <button class="btn neutral small" @onclick="() => _showDaily = false">@Loc.T("common.close")</button>
+            </div>
+        </div>;
+
+    // ===================================================================== crate reveal
+    RenderFragment CrateModal() =>
+        @<div class="modal-backdrop">
+            <div class="modal crate-open" role="dialog" aria-modal="true" data-test="crate-modal">
+                <svg class="crate-art" viewBox="0 0 120 100" aria-hidden="true">
+                    <g class="crate-glow"><circle cx="60" cy="52" r="40" fill="@CrateGlow()" /></g>
+                    <rect x="22" y="44" width="76" height="46" rx="4" fill="#a0692f" />
+                    <rect x="22" y="44" width="76" height="8" fill="#7a4f22" />
+                    <rect x="30" y="52" width="6" height="38" fill="#7a4f22" /><rect x="84" y="52" width="6" height="38" fill="#7a4f22" />
+                    <g class="crate-lid"><rect x="18" y="32" width="84" height="14" rx="3" fill="#b97a37" /><rect x="54" y="36" width="12" height="8" rx="1" fill="#8fa3b8" /></g>
+                </svg>
+                <div class="reveal">
+                    @if (_crateReveal.Rare) { <span class="rare">@Loc.T("crate.rarity_rare")</span> }
+                    <p class="big" data-test="crate-result">@_crateReveal.Text</p>
+                    <button class="btn good" @onclick="() => _crateReveal = null">@Loc.T("common.ok")</button>
+                </div>
+            </div>
+        </div>;
+
+    // ===================================================================== phase celebration
+    RenderFragment PhaseModal() =>
+        @<div class="modal-backdrop">
+            <div class="modal phase-up" role="dialog" aria-modal="true" data-test="phase-modal">
+                <h2>@Loc.T("phase.title")</h2>
+                <p class="big">@S.Config.Phases[_phaseModal].Name</p>
+                <p>@Loc.T("phase.body")</p>
+                <div class="unlocks">
+                    @for (int i = 0; i < S.Config.Machines.Count; i++)
+                    {
+                        var m = S.Config.Machines[i];
+                        if (m.UnlockPhase != _phaseModal) continue;
+                        <div class="unlock"><MachineArt Id="@m.Id" Color="@MachineColors[i % MachineColors.Length]" /><small>@m.Name</small></div>
+                    }
+                </div>
+                <button class="btn good" @onclick="() => _phaseModal = -1">@Loc.T("common.ok")</button>
             </div>
         </div>;
 }

@@ -84,6 +84,16 @@ namespace OfficinaTycoon
             if (c.Experimental.Outcomes.Count > 0 && c.Experimental.Outcomes.Min(x => x.ReturnMultiplier) < 0.0)
                 e.Add("Experimental loss is unbounded");
 
+            if (c.Frenzy.Enabled && (c.Frenzy.TapsToFill < 1 || c.Frenzy.Multiplier < 1 || c.Frenzy.Seconds <= 0 || c.Frenzy.DecayPerSecond < 0))
+                e.Add("Frenzy: invalid values");
+            if (c.Daily.Enabled)
+            {
+                if (c.Daily.Days.Count == 0) e.Add("Daily.Days: empty");
+                if (c.Daily.AdBonusMultiplier < 0) e.Add("Daily.AdBonusMultiplier must be >= 0");
+                foreach (var d in c.Daily.Days)
+                    if (d.OpsSeconds < 0 || d.MinCurrency < 0 || d.Amount < 0) e.Add("Daily: negative reward");
+            }
+
             if (c.Offline.MaxSeconds <= 0) e.Add("Offline.MaxSeconds must be > 0");
             if (c.Offline.Efficiency < 0 || c.Offline.Efficiency > 1) e.Add("Offline.Efficiency must be in [0,1]");
             if (c.Ads.MaxPerDay < 0) e.Add("Ads.MaxPerDay invalid");

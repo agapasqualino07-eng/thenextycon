@@ -21,6 +21,8 @@ namespace OfficinaTycoon
         public SurgeConfig Surge = new SurgeConfig();
         public CrateConfig Crate = new CrateConfig();
         public AdsConfig Ads = new AdsConfig();
+        public FrenzyConfig Frenzy = new FrenzyConfig();
+        public DailyConfig Daily = new DailyConfig();
     }
 
     [Serializable]
@@ -220,6 +222,42 @@ namespace OfficinaTycoon
         /// <summary>If a crate is earned while the storage is full it is converted to this many seconds of production.</summary>
         public double OverflowOpsSeconds = 120;
         public List<CrateEntryDef> Entries = new List<CrateEntryDef>();
+    }
+
+    /// <summary>"Frenesia": tapping fast fills a meter; when full, production (and taps) get a short boost.</summary>
+    [Serializable]
+    public class FrenzyConfig
+    {
+        public bool Enabled = true;
+        public double TapsToFill = 30;
+        /// <summary>Charge lost per second, so only sustained tapping fills the meter.</summary>
+        public double DecayPerSecond = 1.5;
+        public double Multiplier = 2;
+        public double Seconds = 12;
+    }
+
+    public enum DailyRewardKind { Currency, Crate, Parts }
+
+    [Serializable]
+    public class DailyRewardDef
+    {
+        public DailyRewardKind Kind = DailyRewardKind.Currency;
+        public double OpsSeconds = 0;     // Currency: seconds of base production
+        public double MinCurrency = 50;
+        public int Amount = 0;            // Crate / Parts count
+    }
+
+    /// <summary>
+    /// Daily gift calendar. One gift per (UTC) day; the calendar ADVANCES each day you play and never resets
+    /// if you skip days (no pressure/punishment for missing a day).
+    /// </summary>
+    [Serializable]
+    public class DailyConfig
+    {
+        public bool Enabled = true;
+        /// <summary>Optional rewarded ad gives the same gift again (+100%), declared before watching.</summary>
+        public double AdBonusMultiplier = 1.0;
+        public List<DailyRewardDef> Days = new List<DailyRewardDef>();
     }
 
     [Serializable]

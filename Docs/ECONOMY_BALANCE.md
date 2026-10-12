@@ -33,6 +33,9 @@
 - **Inflazione:** i premi sono proporzionali alla produzione (non assoluti), le casse e le ricompense degli eventi hanno tetti (`MaxCurrencyOpsSeconds`, `MaxRewardOpsSeconds`), il saldo ha un tetto (1e24). I saldi finali non accumulati indicano che la valuta viene spesa.
 - **Limiti del modello:** un solo schema di acquisto (rapporto costo/beneficio), nessuna variabilità tra giocatori, nessun abbandono, nessuna conoscenza reale delle abitudini d'uso.
 
+## Frenesia e regalo giornaliero (0.3.0)
+La simulazione include la Frenesia (i profili toccano 1,5–3 volte al secondo durante le sessioni): accelera i primi giorni dei giocatori attivi (giorno 1: 132K/s contro 94K/s del profilo regolare) ma non cambia la progressione a lungo termine (giorno 30: ~205M/s in entrambi i casi). Il regalo giornaliero **non** è simulato: vale tra 2 e 10 minuti di produzione o una piccola quantità di casse/ricambi al giorno, trascurabile rispetto ai guadagni offline.
+
 ## Come ripetere
 ```
 dotnet run --project Tools/Simulator -c Release -- 30
@@ -59,55 +62,55 @@ SIM_TRACE=1 dotnet run --project Tools/Simulator -c Release -- 3     # traccia d
 | Profilo | Trapano a colonna | Tornio | Fresatrice | Centro CNC | Pressa idraulica | Braccio robotico | Linea di assemblaggio | Fabbrica intelligente |
 |---|---|---|---|---|---|---|---|---|
 | Occasionale (3x4min/giorno, con annunci, rifiuta eventi) | 0.0 h / 0 min | 0.0 h / 1 min | 0.1 h / 3 min | 5.4 h / 5 min | 10.7 h / 10 min | 29.3 h / 16 min | 72.0 h / 36 min | 144.0 h / 72 min |
-| Regolare (5x6min/giorno, con annunci, usa eventi) | 0.0 h / 0 min | 0.0 h / 1 min | 0.1 h / 3 min | 3.2 h / 7 min | 6.5 h / 16 min | 12.8 h / 24 min | 57.6 h / 78 min | 144.0 h / 180 min |
-| Molto attivo (10x10min/giorno, con annunci, usa eventi) | 0.0 h / 0 min | 0.0 h / 1 min | 0.1 h / 3 min | 1.6 h / 10 min | 3.2 h / 21 min | 11.2 h / 71 min | 60.8 h / 280 min | 168.0 h / 700 min |
-| Regolare SENZA annunci (5x6min, usa eventi) | 0.0 h / 0 min | 0.0 h / 1 min | 0.1 h / 5 min | 6.4 h / 12 min | 9.6 h / 19 min | 24.0 h / 30 min | 75.2 h / 96 min | 192.0 h / 240 min |
-| Regolare, eventi prudenti/garantiti (5x6min, annunci) | 0.0 h / 0 min | 0.0 h / 1 min | 0.1 h / 3 min | 3.2 h / 7 min | 6.4 h / 13 min | 24.0 h / 30 min | 54.5 h / 76 min | 144.0 h / 180 min |
-| Regolare che RIFIUTA gli eventi casuali (5x6min, annunci) | 0.0 h / 0 min | 0.0 h / 1 min | 0.1 h / 3 min | 3.2 h / 7 min | 6.4 h / 14 min | 24.0 h / 30 min | 54.5 h / 77 min | 144.0 h / 180 min |
+| Regolare (5x6min/giorno, con annunci, usa eventi) | 0.0 h / 0 min | 0.0 h / 1 min | 0.0 h / 3 min | 3.2 h / 6 min | 6.4 h / 14 min | 24.0 h / 30 min | 54.4 h / 72 min | 120.0 h / 150 min |
+| Molto attivo (10x10min/giorno, con annunci, usa eventi) | 0.0 h / 0 min | 0.0 h / 1 min | 0.0 h / 2 min | 1.6 h / 10 min | 3.2 h / 20 min | 9.6 h / 60 min | 48.0 h / 201 min | 168.0 h / 700 min |
+| Regolare SENZA annunci (5x6min, usa eventi) | 0.0 h / 0 min | 0.0 h / 1 min | 0.1 h / 4 min | 6.4 h / 12 min | 9.6 h / 19 min | 24.0 h / 30 min | 75.2 h / 96 min | 216.0 h / 270 min |
+| Regolare, eventi prudenti/garantiti (5x6min, annunci) | 0.0 h / 0 min | 0.0 h / 1 min | 0.0 h / 3 min | 3.2 h / 6 min | 6.4 h / 13 min | 12.8 h / 24 min | 54.4 h / 72 min | 144.0 h / 180 min |
+| Regolare che RIFIUTA gli eventi casuali (5x6min, annunci) | 0.0 h / 0 min | 0.0 h / 1 min | 0.0 h / 3 min | 3.2 h / 6 min | 6.4 h / 13 min | 12.8 h / 24 min | 57.6 h / 78 min | 144.0 h / 180 min |
 
 ## Produzione di base al secondo, saldo e fasi
 
 | Profilo | Giorno 1 | Giorno 3 | Giorno 7 | Giorno 14 | Giorno 30 | Fase 2 raggiunta (h) | Fase 3 raggiunta (h) | Max ore senza acquisti | Annunci guardati | Eventi completati | Eventi sperimentali: speso -> restituito |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Occasionale (3x4min/giorno, con annunci, rifiuta eventi) | 20.26K | 1.13M | 20.28M | 50.04M | 202.83M | 5.3 | 58.7 | 18.6 | 179 | 0 | 0 -> 0 |
-| Regolare (5x6min/giorno, con annunci, usa eventi) | 93.53K | 2.8M | 22.33M | 46.92M | 204.68M | 3.2 | 48.0 | 11.2 | 242 | 296 | 1.69T -> 2.32T |
-| Molto attivo (10x10min/giorno, con annunci, usa eventi) | 219.83K | 2.96M | 17.33M | 43.4M | 188.2M | 1.6 | 36.8 | 12.8 | 246 | 597 | 2.95T -> 4.21T |
-| Regolare SENZA annunci (5x6min, usa eventi) | 46.18K | 1.3M | 15.11M | 34.55M | 145.23M | 3.3 | 57.6 | 14.4 | 0 | 295 | 943.7B -> 1.46T |
-| Regolare, eventi prudenti/garantiti (5x6min, annunci) | 99.44K | 3.04M | 24.4M | 46.95M | 205.53M | 3.2 | 48.0 | 14.4 | 242 | 297 | 848.92B -> 1.02T |
-| Regolare che RIFIUTA gli eventi casuali (5x6min, annunci) | 98.79K | 3.03M | 24.4M | 46.95M | 205.49M | 3.2 | 48.0 | 14.4 | 242 | 0 | 0 -> 0 |
+| Occasionale (3x4min/giorno, con annunci, rifiuta eventi) | 20.26K | 1.13M | 20.28M | 49.91M | 202.79M | 5.3 | 58.7 | 18.6 | 179 | 0 | 0 -> 0 |
+| Regolare (5x6min/giorno, con annunci, usa eventi) | 132.55K | 3.29M | 24.74M | 46.99M | 204.62M | 3.2 | 48.0 | 11.2 | 242 | 296 | 1.7T -> 2.42T |
+| Molto attivo (10x10min/giorno, con annunci, usa eventi) | 243.3K | 3.61M | 20.06M | 47.38M | 182.46M | 1.6 | 35.2 | 12.8 | 246 | 597 | 2.77T -> 4T |
+| Regolare SENZA annunci (5x6min, usa eventi) | 46.51K | 1.23M | 14.45M | 32.44M | 142.15M | 3.3 | 57.6 | 14.4 | 0 | 296 | 872.33B -> 1.26T |
+| Regolare, eventi prudenti/garantiti (5x6min, annunci) | 108.33K | 3.03M | 24.08M | 46.57M | 203.92M | 3.2 | 48.0 | 14.4 | 242 | 297 | 842.66B -> 1.01T |
+| Regolare che RIFIUTA gli eventi casuali (5x6min, annunci) | 88.3K | 2.8M | 24.38M | 46.89M | 206.2M | 3.2 | 48.0 | 14.4 | 242 | 0 | 0 -> 0 |
 
 ## Ora (dall'inizio) in cui ogni ordine viene riscosso - profilo Regolare con annunci
 
 | Ordine | Tipo | Ore |
 |---|---|---|
 | t1 Primi pezzi | TapCount | 0.00 |
-| t2 Un po' di aiuto | MachineLevel | 0.00 |
+| t2 Un po' di aiuto | MachineLevel | 0.01 |
 | t3 Produzione automatica | OutputPerSecond | 0.01 |
 | a1 Ordine officina locale | EarnCurrency | 0.02 |
-| a2 Secondo macchinario | MachineLevel | 0.04 |
+| a2 Secondo macchinario | MachineLevel | 0.03 |
 | a3 Utensili migliori | BuyUpgrade | 0.03 |
-| a4 Lotto di alberi | ProduceWithMachine | 0.05 |
-| a5 Consegna express | EarnCurrency | 0.04 |
-| a6 Terza linea | MachineLevel | 3.20 |
-| b1 Commessa regionale | OutputPerSecond | 6.41 |
+| a4 Lotto di alberi | ProduceWithMachine | 0.04 |
+| a5 Consegna express | EarnCurrency | 0.03 |
+| a6 Terza linea | MachineLevel | 0.09 |
+| b1 Commessa regionale | OutputPerSecond | 6.40 |
 | b2 Esperimenti industriali | CompleteEvent | 3.28 |
 | b3 Controllo numerico | MachineLevel | 6.41 |
-| b4 Grande commessa | EarnCurrency | 12.83 |
-| b5 Reparto presse | MachineLevel | 24.00 |
-| b6 Automazione | MachineLevel | 27.20 |
-| c1 Contratto industriale | OutputPerSecond | 78.46 |
-| c2 Produzione in serie | ProduceWithMachine | 363.26 |
-| c3 Fabbrica del futuro | MachineLevel | 360.01 |
+| b4 Grande commessa | EarnCurrency | 12.80 |
+| b5 Reparto presse | MachineLevel | 12.80 |
+| b6 Automazione | MachineLevel | 24.01 |
+| c1 Contratto industriale | OutputPerSecond | 75.24 |
+| c2 Produzione in serie | ProduceWithMachine | 336.06 |
+| c3 Fabbrica del futuro | MachineLevel | 360.00 |
 | c4 Maestro dell'industria | EarnCurrency | non completato |
 
 ## Guadagni cumulati (valuta totale guadagnata) e saldo finale
 
 | Profilo | Giorno 1 | Giorno 7 | Giorno 30 | Saldo finale |
 |---|---|---|---|---|
-| Occasionale (3x4min/giorno, con annunci, rifiuta eventi) | 64.33M | 2.93T | 226.5T | 67.05B |
-| Regolare (5x6min/giorno, con annunci, usa eventi) | 871.79M | 4.04T | 231.07T | 592.88B |
-| Molto attivo (10x10min/giorno, con annunci, usa eventi) | 3.47B | 2.95T | 185.77T | 2.55T |
-| Regolare SENZA annunci (5x6min, usa eventi) | 319.07M | 1.63T | 90.24T | 187.04B |
-| Regolare, eventi prudenti/garantiti (5x6min, annunci) | 681.2M | 4.22T | 229.67T | 2.78T |
-| Regolare che RIFIUTA gli eventi casuali (5x6min, annunci) | 664.86M | 4.17T | 225.41T | 2.7T |
+| Occasionale (3x4min/giorno, con annunci, rifiuta eventi) | 64.86M | 2.93T | 226.81T | 897.48B |
+| Regolare (5x6min/giorno, con annunci, usa eventi) | 958.82M | 4.7T | 234.21T | 956.73B |
+| Molto attivo (10x10min/giorno, con annunci, usa eventi) | 4.85B | 4.22T | 182.83T | 2.9T |
+| Regolare SENZA annunci (5x6min, usa eventi) | 331.21M | 1.54T | 83.8T | 385.35B |
+| Regolare, eventi prudenti/garantiti (5x6min, annunci) | 892.11M | 4.18T | 230.01T | 379.79B |
+| Regolare che RIFIUTA gli eventi casuali (5x6min, annunci) | 839.84M | 4.17T | 236.58T | 2.83T |
 

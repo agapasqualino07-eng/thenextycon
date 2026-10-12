@@ -98,6 +98,15 @@ namespace OfficinaTycoon
             c.Crate.Entries.Add(new CrateEntryDef { Id = "parts", Label = "Ricambi", Kind = CrateRewardKind.Parts, ProbabilityPercent = 17, Parts = 3 });
             c.Crate.Entries.Add(new CrateEntryDef { Id = "alloy", Label = "Lega rara (molti ricambi)", Kind = CrateRewardKind.Parts, ProbabilityPercent = 3, Parts = 12 });
 
+            // ---- Daily gift (7-day cycle, no reset when a day is skipped) -----------------------
+            c.Daily.Days.Add(new DailyRewardDef { Kind = DailyRewardKind.Currency, OpsSeconds = 120, MinCurrency = 50 });
+            c.Daily.Days.Add(new DailyRewardDef { Kind = DailyRewardKind.Parts, Amount = 3 });
+            c.Daily.Days.Add(new DailyRewardDef { Kind = DailyRewardKind.Currency, OpsSeconds = 300, MinCurrency = 100 });
+            c.Daily.Days.Add(new DailyRewardDef { Kind = DailyRewardKind.Crate, Amount = 1 });
+            c.Daily.Days.Add(new DailyRewardDef { Kind = DailyRewardKind.Currency, OpsSeconds = 600, MinCurrency = 200 });
+            c.Daily.Days.Add(new DailyRewardDef { Kind = DailyRewardKind.Parts, Amount = 8 });
+            c.Daily.Days.Add(new DailyRewardDef { Kind = DailyRewardKind.Crate, Amount = 2 });
+
             return c;
         }
 

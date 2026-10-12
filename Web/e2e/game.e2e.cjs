@@ -70,7 +70,15 @@ const t = (name) => `[data-test="${name}"]`;
 async function shot(page, name) { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png') }); }
 async function balance(page) { return (await page.locator(t('balance')).textContent()).trim(); }
 async function tapN(page, n) { for (let i = 0; i < n; i++) await page.locator(t('tap')).click(); }
-async function tab(page, name) { await page.locator(t('nav-' + name)).click(); }
+async function tab(page, name) { await closeCelebrations(page); await page.locator(t('nav-' + name)).click(); }
+// Celebration popups (new phase, crate reveal, daily gift) are part of the design: tests acknowledge them like a player.
+async function closeCelebrations(page) {
+  for (const m of ['phase-modal', 'crate-modal', 'daily-modal']) {
+    const loc = page.locator(t(m));
+    if (await loc.count()) await loc.locator('button').last().click();
+  }
+}
+async function dev(page, name) { await closeCelebrations(page); await page.locator(t(name)).click(); await page.waitForTimeout(150); await closeCelebrations(page); }
 
 // ---------------------------------------------------------------- release build
 test('release: boots on an iPhone viewport with no errors, CSP violations or third-party requests', async () => {
@@ -189,7 +197,7 @@ test('release: installable PWA — manifest, icons and offline start via service
 test('dev: offline earnings popup, simulated rewarded ad grants the declared bonus once', { skip: !DEV_DIR }, async () => {
   const { context, page, problems } = await open(devUrl + '?dev=1');
   await tab(page, 'settings');
-  await page.locator(t('dev-1b')).click();
+  await dev(page, 'dev-1b');
   await tab(page, 'factory');
   await page.locator(t('buy-drill')).click();
   await tab(page, 'settings');
@@ -210,21 +218,21 @@ test('dev: offline earnings popup, simulated rewarded ad grants the declared bon
 test('dev: experimental machine shows odds before paying, needs confirmation, pays once', { skip: !DEV_DIR }, async () => {
   const { context, page, problems } = await open(devUrl + '?dev=1');
   await tab(page, 'settings');
-  await page.locator(t('dev-1b')).click();
+  await dev(page, 'dev-1b');
   await tab(page, 'factory');
   await page.locator(t('buy-drill')).click();
   await tab(page, 'settings');
-  await page.locator(t('dev-phase')).click();
-  await page.locator(t('dev-events')).click();
+  await dev(page, 'dev-phase');
+  await dev(page, 'dev-events');
   await tab(page, 'events');
   const rows = page.locator(`${t('exp-odds')} tr`);
   assert.equal(await rows.count(), 4);
   const percents = await rows.locator('td:first-child').allTextContents();
   assert.equal(percents.map(p => parseFloat(p)).reduce((a, b) => a + b, 0), 100);
   await shot(page, '04-evento-sperimentale');
-  const bal0 = await balance(page);
-  await page.locator(t('exp-test')).click();                // first tap only arms the confirmation
-  assert.equal(await balance(page), bal0);
+  await page.locator(t('exp-test')).click();                // first tap only arms the confirmation: nothing is paid yet
+  assert.equal(await page.locator(t('exp-odds')).count(), 1, 'offer still open after the first tap');
+  assert.doesNotMatch(await page.locator(t('experimental')).textContent(), /Collaudo in corso/);
   assert.match(await page.locator(t('exp-test')).textContent(), /Conferma/);
   await page.locator(t('exp-test')).click();                // second tap pays
   await page.waitForFunction(() => /Collaudo in corso/.test(document.querySelector('[data-test="experimental"]').textContent));
@@ -241,17 +249,103 @@ test('dev: experimental machine shows odds before paying, needs confirmation, pa
 test('dev: surge and free crate work and show their odds', { skip: !DEV_DIR }, async () => {
   const { context, page, problems } = await open(devUrl + '?dev=1');
   await tab(page, 'settings');
-  await page.locator(t('dev-1b')).click();
-  await page.locator(t('dev-phase')).click();
-  await page.locator(t('dev-events')).click();
-  await page.locator(t('dev-crate')).click();
+  await dev(page, 'dev-1b');
+  await dev(page, 'dev-phase');
+  await dev(page, 'dev-events');
+  await dev(page, 'dev-crate');
   await tab(page, 'events');
   await page.locator(t('surge-guaranteed')).click();
   await page.waitForFunction(() => /Bonus attivo/.test(document.querySelector('[data-test="surge"]').textContent));
   assert.equal(await page.locator(`${t('crate-odds')} tr`).count(), 5);
   await page.locator(t('crate-open')).click();
-  await page.locator(t('crate-result')).waitFor();
-  await shot(page, '05-eventi');
+  await page.locator(t('crate-modal')).waitFor();
+  await page.waitForTimeout(1200);                          // short, fixed opening animation
+  assert.ok((await page.locator(`${t('crate-modal')} ${t('crate-result')}`).textContent()).length > 3);
+  await shot(page, '05-cassa');
+  await closeCelebrations(page);
+  await shot(page, '06-eventi');
   assert.deepEqual(problems, []);
+  await context.close();
+});
+
+// ---------------------------------------------------------------- engagement & visual effects
+test('release: animated factory scene shows a drawing for every machine and reacts to purchases', async () => {
+  const { context, page, problems } = await open(releaseUrl);
+  assert.equal(await page.locator('.scene .bay').count(), 8);
+  assert.equal(await page.locator('.scene .bay svg.art').count(), 8);
+  assert.equal(await page.locator('.scene .bay.locked').count(), 7);
+  await tapN(page, 20);
+  await tab(page, 'factory');
+  await page.locator(t('buy-drill')).click();
+  await page.waitForSelector('.bay[data-bay="drill"].owned');
+  const anim = await page.evaluate(() => getComputedStyle(document.querySelector('.bay[data-bay="drill"] .a-drill')).animationName);
+  assert.equal(anim, 'drill', 'owned machines are animated');
+  assert.ok(await page.locator('.belt .item').count() >= 1, 'goods ride the conveyor');
+  await shot(page, '07-fabbrica');
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('release: fast tapping fills the frenzy meter and triggers the boost', async () => {
+  const { context, page, problems } = await open(releaseUrl);
+  const tap = page.locator(t('tap'));
+  for (let i = 0; i < 60 && !(await tap.getAttribute('class')).includes('frenzy'); i++) await tap.click({ delay: 0 });
+  await page.waitForFunction(() => document.querySelector('[data-test="tap"]').classList.contains('frenzy'));
+  assert.match(await tap.textContent(), /FRENESIA/);
+  await shot(page, '08-frenesia');
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('release: daily gift opens from the top bar, pays once and disappears', async () => {
+  const { context, page } = await open(releaseUrl);
+  await page.locator(t('daily-open')).click();
+  await page.locator(t('daily-modal')).waitFor();
+  assert.equal(await page.locator('.day').count(), 7);
+  await shot(page, '09-regalo');
+  await page.locator(t('daily-claim')).click();
+  await page.waitForFunction(() => !document.querySelector('[data-test="daily-modal"]'));
+  await page.waitForFunction(() => document.querySelector('[data-test="balance"]').textContent.trim() !== '0 Cr');
+  assert.equal(await page.locator(t('daily-open')).count(), 0, 'one gift per day');
+  await context.close();
+});
+
+test('dev: milestone at level 25 and new-phase celebration are shown', { skip: !DEV_DIR }, async () => {
+  const { context, page, problems } = await open(devUrl + '?dev=1');
+  await tab(page, 'settings');
+  await page.locator(t('dev-1b')).click();
+  await page.locator(t('phase-modal')).waitFor();             // 1B credits => new phase
+  assert.ok(await page.locator(`${t('phase-modal')} svg.art`).count() >= 1, 'unlocked machines are pictured');
+  await shot(page, '10-nuova-fase');
+  await closeCelebrations(page);
+  await tab(page, 'factory');
+  await page.locator('.mode', { hasText: 'Max' }).click();
+  await page.locator(t('buy-drill')).click();
+  await page.locator(t('banner')).waitFor();
+  assert.match(await page.locator(t('banner')).textContent(), /livello \d+: produzione x2/);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('release: reduced effects setting is honoured and remembered', async () => {
+  const { context, page } = await open(releaseUrl);
+  await tab(page, 'settings');
+  await page.locator(t('toggle-effects')).click();
+  assert.match(await page.locator(t('toggle-effects')).textContent(), /Ridotti/);
+  await page.reload();
+  await page.locator(t('balance')).waitFor();
+  await tab(page, 'settings');
+  assert.match(await page.locator(t('toggle-effects')).textContent(), /Ridotti/);
+  await context.close();
+});
+
+test('release: animations stay smooth (no long main-thread stalls while tapping and producing)', async () => {
+  const { context, page } = await open(releaseUrl);
+  await page.evaluate(() => { window.__long = []; new PerformanceObserver(l => window.__long.push(...l.getEntries().map(e => e.duration))).observe({ type: 'longtask', buffered: false }); });
+  await tapN(page, 25);
+  await page.waitForTimeout(2000);
+  const long = await page.evaluate(() => window.__long);
+  const worst = long.length ? Math.max(...long) : 0;
+  assert.ok(worst < 250, 'longest main-thread task ' + worst + 'ms');
   await context.close();
 });
