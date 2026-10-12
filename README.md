@@ -7,7 +7,7 @@ comprano e potenziano macchinari, si completano ordini e si reinveste. Offline-f
 La cartella `Web/` contiene la versione **installabile su iPhone** (PWA): la **stessa logica C#** del gioco compilata in WebAssembly,
 con interfaccia mobile, salvataggio sul dispositivo, backup/ripristino e funzionamento offline.
 Istruzioni complete: **[Docs/INSTALL_IPHONE.md](Docs/INSTALL_IPHONE.md)** (pubblicazione con GitHub Pages + "Aggiungi alla schermata Home").
-Verifiche eseguite: 252 test unitari + **22 test end-to-end in un browser reale** (Chromium con schermo e tocco da iPhone) a ogni push via GitHub Actions.
+Verifiche eseguite: 252 test unitari + **27 test end-to-end in un browser reale** (Chromium con schermo e tocco da iPhone) a ogni push via GitHub Actions.
 Sicurezza: [Docs/SECURITY.md](Docs/SECURITY.md).
 **Demo** con video simulati e strumenti di prova (salvataggio separato): `https://agapasqualino07-eng.github.io/thenextycon/demo/`.
 
@@ -108,7 +108,7 @@ Documenti: [INSTALL_IPHONE](Docs/INSTALL_IPHONE.md) · [SECURITY](Docs/SECURITY.
 | 11 | Rewarded robusto o mock identificato | Mock testato; rete reale assente |
 | 12 | Ricompensa base indipendente dall'annuncio | Testato |
 | 13 | Niente duplicazione ricompense | Testato per le sequenze previste (limite: salvataggio locale non è inviolabile) |
-| 14 | Test automatici passano | **252/252 con dotnet** + 22/22 e2e web; Unity Test Runner non eseguito |
+| 14 | Test automatici passano | **252/252 con dotnet** + 27/27 e2e web; Unity Test Runner non eseguito |
 | 15 | Build verificata | **No** |
 | 16 | Configurazioni e dipendenze documentate | Sì |
 | 17 | Checklist di pubblicazione | Sì |

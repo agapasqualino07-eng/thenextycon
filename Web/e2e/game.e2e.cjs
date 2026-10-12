@@ -70,7 +70,7 @@ const t = (name) => `[data-test="${name}"]`;
 async function shot(page, name) { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png') }); }
 async function balance(page) { return (await page.locator(t('balance')).textContent()).trim(); }
 async function tapN(page, n) { for (let i = 0; i < n; i++) await page.locator(t('tap')).click(); }
-async function tab(page, name) { await closeCelebrations(page); await page.locator(t('nav-' + name)).click(); }
+async function tab(page, name) { await page.waitForTimeout(150); await closeCelebrations(page); await page.locator(t('nav-' + name)).click(); }
 // Celebration popups (new phase, crate reveal, daily gift) are part of the design: tests acknowledge them like a player.
 async function closeCelebrations(page) {
   for (const m of ['phase-modal', 'crate-modal', 'daily-modal', 'welcome-modal']) {
@@ -78,7 +78,7 @@ async function closeCelebrations(page) {
     if (await loc.count()) await loc.locator('button').last().click();
   }
 }
-async function dev(page, name) { await closeCelebrations(page); await page.locator(t(name)).click(); await page.waitForTimeout(150); await closeCelebrations(page); }
+async function dev(page, name) { await closeCelebrations(page); await page.locator(t(name)).click(); await page.waitForTimeout(400); await closeCelebrations(page); }
 
 // ---------------------------------------------------------------- release build
 test('release: boots on an iPhone viewport with no errors, CSP violations or third-party requests', async () => {
@@ -429,5 +429,78 @@ test('dev: double an order reward with a video', { skip: !DEV_DIR }, async () =>
   // 10 from taps + 2 x 15 doubled reward; the displayed balance rolls up, so wait for it
   await page.waitForFunction(() => parseFloat(document.querySelector('[data-test="balance"]').textContent.replace(/[^0-9.]/g, '')) >= 40, null, { timeout: 10000 });
   assert.deepEqual(problems, []);
+  await context.close();
+});
+
+// ---------------------------------------------------------------- touch behaviour (0.4.1)
+async function waitBalance(page, text) {
+  await page.waitForFunction(v => document.querySelector('[data-test="balance"]').textContent.trim() === v, text, { timeout: 10000 });
+}
+
+test('touch: every finger tap on the bench counts exactly once; keyboard works too', async () => {
+  const { context, page, problems } = await open(releaseUrl);
+  for (let i = 0; i < 10; i++) await page.tap(t('tap'));
+  await waitBalance(page, '10 Cr');                                    // not 20: no double counting of press + click
+  await page.waitForTimeout(1100);
+  await page.locator(t('tap')).press('Enter');
+  await waitBalance(page, '11 Cr');
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+test('touch: two fingers at once count as two taps (multi-touch)', async () => {
+  const { context, page } = await open(releaseUrl);
+  const box = await page.locator(t('tap')).boundingBox();
+  const cdp = await context.newCDPSession(page);
+  const y = box.y + box.height / 2;
+  for (let i = 0; i < 3; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + 60, y, id: 1 }, { x: box.x + box.width - 60, y, id: 2 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+  await waitBalance(page, '6 Cr');
+  await context.close();
+});
+
+test('touch: messages (toasts/banners) never block the buttons underneath', async () => {
+  const { context, page } = await open(releaseUrl);
+  await tapN(page, 10);
+  await tab(page, 'orders');
+  await page.locator(t('claim-t1')).click();                          // "order completed" toast over the list
+  await page.locator(t('toast')).waitFor();
+  const hit = await page.evaluate(() => {
+    const r = document.querySelector('[data-test="toast"]').getBoundingClientRect();
+    const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return el ? (el.closest('[data-test="toast"]') ? 'toast' : 'other') : 'none';
+  });
+  assert.equal(hit, 'other', 'a tap on the toast area reaches the UI below');
+  await context.close();
+});
+
+test('touch: no text selection or long-press menu on game elements; text fields stay editable', async () => {
+  const { context, page } = await open(releaseUrl);
+  const sel = await page.evaluate(() => getComputedStyle(document.querySelector('[data-test="tap"]')).userSelect);
+  assert.equal(sel, 'none');
+  const prevented = await page.evaluate(() => {
+    const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    document.querySelector('[data-test="tap"]').dispatchEvent(ev);
+    return ev.defaultPrevented;
+  });
+  assert.ok(prevented, 'long-press callout suppressed');
+  await tab(page, 'settings');
+  const taSel = await page.evaluate(() => getComputedStyle(document.querySelector('[data-test="import-text"]')).userSelect);
+  assert.notEqual(taSel, 'none');
+  const ta = await page.evaluate(() => getComputedStyle(document.documentElement).touchAction);
+  assert.equal(ta, 'manipulation', 'no double-tap zoom');
+  await context.close();
+});
+
+test('touch: the mascot never covers a machine bay', async () => {
+  const { context, page } = await open(releaseUrl);
+  const m = await page.locator('.mascot-btn').boundingBox();
+  for (const bay of await page.locator('.bay').all()) {
+    const b = await bay.boundingBox();
+    const overlap = !(m.x + m.width <= b.x || b.x + b.width <= m.x || m.y + m.height <= b.y || b.y + b.height <= m.y);
+    assert.ok(!overlap, 'mascot overlaps ' + await bay.getAttribute('data-bay'));
+  }
   await context.close();
 });

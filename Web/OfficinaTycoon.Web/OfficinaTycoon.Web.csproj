@@ -10,7 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>OfficinaTycoon.Web</RootNamespace>
     <AssemblyName>OfficinaTycoon.Web</AssemblyName>
-    <Version>0.4.0</Version>
+    <Version>0.4.1</Version>
     <InvariantGlobalization>true</InvariantGlobalization>
     <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>

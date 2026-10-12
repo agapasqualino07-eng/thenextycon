@@ -265,12 +265,31 @@ namespace OfficinaTycoon.Web.Components
         }
 
         // ------------------------------------------------------------ actions
-        void OnTap(MouseEventArgs e)
+        // Touch/mouse: counted on finger-down, so fast taps and several fingers at once are never lost
+        // (a "click" only arrives after the finger lifts and iOS may merge quick taps).
+        DateTime _lastPointerDown = DateTime.MinValue;
+
+        void OnTapPointer(PointerEventArgs e)
+        {
+            if (e.Button > 0) return;                       // ignore right/middle mouse buttons
+            _lastPointerDown = DateTime.UtcNow;
+            DoTap(e.ClientX, e.ClientY);
+        }
+
+        // After a finger/mouse press the browser also fires a "click" (with detail 0 or 1 depending on the browser):
+        // that one was already counted. A click with no press just before it comes from the keyboard (Enter/Space).
+        void OnTapClick(MouseEventArgs e)
+        {
+            if ((DateTime.UtcNow - _lastPointerDown).TotalMilliseconds < 1000) return;
+            DoTap(0, 0);
+        }
+
+        void DoTap(double clientX, double clientY)
         {
             double got = S.Production.Tap();
             Sfx("tap");
             _hit = !_hit;
-            if (e != null && (e.ClientX > 0 || e.ClientY > 0)) Fx("burst", e.ClientX, e.ClientY, "tap");
+            if (clientX > 0 || clientY > 0) Fx("burst", clientX, clientY, "tap");
             if (_floaters.Count < 12)
                 _floaters.Add(new Floater { Id = ++_floaterId, Text = Fmt.Num(got), X = _rnd.Next(10, 85), Born = DateTime.UtcNow });
         }

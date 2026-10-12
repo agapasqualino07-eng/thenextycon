@@ -83,5 +83,16 @@
   }
   function pageUrl() { return window.location.origin + window.location.pathname; }
 
+  // ---- touch hygiene for iOS Safari / home-screen app
+  // An (empty) touchstart listener makes iOS apply :active styles, so buttons visibly "press".
+  document.addEventListener('touchstart', () => {}, { passive: true });
+  // Block pinch-zoom gestures (Safari ignores user-scalable=no); the UI is designed for 100% scale.
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
+  // Block the long-press callout/context menu on game elements (text fields keep it).
+  document.addEventListener('contextmenu', e => {
+    const tag = e.target && e.target.tagName;
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA') e.preventDefault();
+  });
+
   window.officina = { storage, lifecycle, sfx, isIos, isStandalone, copyText, queryFlag, share, queryValue, clearQuery, pageUrl };
 })();

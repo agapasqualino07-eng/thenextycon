@@ -378,3 +378,25 @@ textarea, .code-entry input { border: 3px solid var(--ink); border-radius: 12px;
 @media (prefers-reduced-motion: reduce) {
   .mascot-btn, .mascot .eyes, .mascot .antenna, .mascot.talking .arm-r, .bubble { animation: none !important; }
 }
+
+
+/* ######################################################################################################
+   TOUCH FIXES (0.4.1)
+   ###################################################################################################### */
+/* No double-tap zoom anywhere (also between buttons), vertical scrolling still works. */
+html, body { touch-action: manipulation; }
+/* Rapid tapping must never select text or open the iOS callout ("Copy"/magnifier). Text fields stay editable. */
+.app, .app * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.app input, .app textarea { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+svg, img { -webkit-user-drag: none; }
+/* Messages float above the UI but never steal a tap from the buttons underneath. */
+.toast, .banner, .demo-ribbon, .floater, .bubble { pointer-events: none; }
+/* The tap bench must not scroll/zoom the page while being hammered. */
+.tap { touch-action: none; }
+/* Mascot sits beside the goal chip, so it never covers a machine. */
+.goal-row { position: relative; display: flex; align-items: flex-end; gap: 6px; margin: 6px 8px 0; min-height: 48px; }
+.goal-row .goal { flex: 1; margin: 0; min-width: 0; }
+.goal-row .goal.empty { display: block; visibility: hidden; }
+.goal-row .mascot { position: relative; left: auto; bottom: auto; flex: none; width: 50px; z-index: 6; }
+.goal-row .mascot-btn { width: 50px; }
+.goal-row .bubble { left: 46px; bottom: 44px; }

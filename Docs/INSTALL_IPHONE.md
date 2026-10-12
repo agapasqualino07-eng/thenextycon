@@ -12,7 +12,7 @@ La repository è **privata**: GitHub Pages su repository private richiede un pia
 | **B. Repository privata + GitHub Pro** | Come A ma senza cambiare la visibilità. | Il **sito** è comunque pubblico (il codice no). |
 | **C. Repository privata, hosting statico esterno** | Actions → ultimo run *Web app* → scarica l'artefatto **officina-tycoon-web** → caricalo su un hosting statico HTTPS (es. trascinando la cartella su un servizio di "drag & drop" per siti statici). | Serve HTTPS (obbligatorio per l'installazione e il funzionamento offline). |
 
-Il workflow `.github/workflows/web.yml` a ogni push compila, esegue **252 test** e **22 test nel browser**, e solo su `main` pubblica su Pages.
+Il workflow `.github/workflows/web.yml` a ogni push compila, esegue **252 test** e **27 test nel browser**, e solo su `main` pubblica su Pages.
 
 ## 2. Installare sull'iPhone
 1. Apri l'indirizzo del sito con **Safari** (non con altri browser in-app).

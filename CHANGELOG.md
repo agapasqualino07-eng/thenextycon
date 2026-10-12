@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.1 — Correzioni del tocco (iPhone)
+### Corretto
+- I messaggi (fumetti, banner, etichetta DEMO) non bloccano più i tocchi sui pulsanti sottostanti.
+- Il banco "Lavora" registra il tocco appena il dito appoggia: tocchi rapidi non vengono persi e **più dita insieme contano tutte** (utile per la Frenesia); il click finale generato dal browser non viene contato due volte; da tastiera funziona ancora.
+- Niente selezione del testo in blu, lente o menu "Copia" con tocchi ripetuti o pressione lunga (i campi di testo restano modificabili).
+- Niente zoom accidentale con doppio tocco o pizzico.
+- Su Safari i pulsanti mostrano di nuovo l'effetto "premuto".
+- La mascotte Bullo è stata spostata accanto all'obiettivo e non copre più la Pressa idraulica.
+### Test
+- 5 nuovi test nel browser con tocco simulato (incluso multi-touch con due dita): 27 in totale.
+
 ## 0.4.0 — Stile cartoon, premi e inviti
 ### Aggiunto
 - **Stile cartoon**: colori vivaci, contorni spessi, caratteri arrotondati, pulsanti 3D "gommosi", moneta d'oro, cieli diversi per fase, contorni sui disegni dei macchinari.

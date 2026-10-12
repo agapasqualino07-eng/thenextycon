@@ -26,14 +26,15 @@ else
         <div class="bar"><div class="fill steel" style="width:@Pct(S.Progression.NextPhaseProgress)"></div></div>
     </header>
 
-    <div class="scene-wrap">
-        <FactoryScene S="S" Colors="MachineColors" PopId="@(DateTime.UtcNow < _popUntil ? _popId : null)" OnBayClick="OnBayClick" />
+    <FactoryScene S="S" Colors="MachineColors" PopId="@(DateTime.UtcNow < _popUntil ? _popId : null)" OnBayClick="OnBayClick" />
+
+    <div class="goal-row">
         <Mascot Say="@(DateTime.UtcNow < _sayUntil ? _say : null)" OnTap="NextTip" />
+        @GoalChip()
     </div>
 
-    @GoalChip()
-
-    <button class="tap @(_hit ? "hit-a" : "hit-b") @(S.Frenzy.Active ? "frenzy" : "")" data-test="tap" @onclick="OnTap">
+    <button class="tap @(_hit ? "hit-a" : "hit-b") @(S.Frenzy.Active ? "frenzy" : "")" data-test="tap"
+            @onpointerdown="OnTapPointer" @onpointerdown:preventDefault="true" @onclick="OnTapClick" @oncontextmenu:preventDefault="true">
         <svg class="bench" viewBox="0 0 64 40" aria-hidden="true">
             <rect x="10" y="26" width="44" height="7" rx="2" fill="#3b2a12" />
             <path d="M18 26 L22 18 L44 18 L48 26 Z" fill="#5a4a36" />
