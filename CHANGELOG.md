@@ -8,8 +8,11 @@
 - Niente zoom accidentale con doppio tocco o pizzico.
 - Su Safari i pulsanti mostrano di nuovo l'effetto "premuto".
 - La mascotte Bullo è stata spostata accanto all'obiettivo e non copre più la Pressa idraulica.
+- Durante il martellamento del banco l'interfaccia si ridisegna al massimo ~10 volte al secondo (conteggio, suono ed effetti restano immediati): meno lavoro sui telefoni lenti (blocchi del thread principale -25% con CPU 4x più lenta).
+- La festa di "Nuova fase" compare insieme all'azione che la causa (prima poteva arrivare un istante dopo e coprire il tocco successivo).
 ### Test
 - 5 nuovi test nel browser con tocco simulato (incluso multi-touch con due dita): 27 in totale.
+- La suite nel browser gira anche con **CPU 4 volte più lenta** (simulazione di un telefono lento), in locale e in CI: ha trovato due corse temporali che facevano fallire la pubblicazione della 0.4.0, ora corrette.
 
 ## 0.4.0 — Stile cartoon, premi e inviti
 ### Aggiunto

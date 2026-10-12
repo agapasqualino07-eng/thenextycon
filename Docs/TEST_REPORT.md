@@ -3,7 +3,7 @@
 Ambiente: container Linux, .NET SDK 8.0.131 (apt), NUnit 3.14, Microsoft.NET.Test.Sdk 17.11.1, C# LangVersion 9 (come Unity 6). **Unity Editor non disponibile.**
 
 ## Risultato eseguito (aggiornato alla 0.4.1: 252 unitari, 27 nel browser)
-In 0.4.1: 5 test di tocco (tocchi col dito contati una sola volta, multi-touch con due dita via protocollo DevTools, fumetti che non bloccano i pulsanti, niente selezione/menu di pressione lunga e niente zoom da doppio tocco, mascotte che non copre le macchine). Hanno trovato un difetto introdotto dalla prima correzione (doppio conteggio pressione + click su touch), corretto prima del rilascio.
+In 0.4.1: 5 test di tocco (tocchi col dito contati una sola volta, multi-touch con due dita via protocollo DevTools, fumetti che non bloccano i pulsanti, niente selezione/menu di pressione lunga e niente zoom da doppio tocco, mascotte che non copre le macchine). Hanno trovato un difetto introdotto dalla prima correzione (doppio conteggio pressione + click su touch), corretto prima del rilascio. La suite gira anche con CPU rallentata 4x (`CPU_THROTTLE=4`, anche in CI): 27/27 in entrambe le modalità.
 
 ### Risultati 0.4.0
 In 0.4.0: `SocialAndRewardsTests` (codice invito, link non validi o con tentativi di iniezione, proprio codice, una volta per dispositivo, condivisione una volta al giorno con orologio all'indietro, cassa via video con limite giornaliero e richiamate ripetute, ordine x2 via video anche se riscosso durante il video, **compatibilità con salvataggi 0.2/0.3**) e 6 test nel browser (mascotte, link di invito, codici malformati, condivisione, cassa via video, ordine x2).

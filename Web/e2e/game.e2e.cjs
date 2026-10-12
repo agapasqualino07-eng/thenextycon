@@ -58,8 +58,13 @@ async function open(url, extra = {}) {
   page.on('console', m => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
   page.on('pageerror', e => problems.push('pageerror: ' + e.message));
   page.on('request', r => { if (!r.url().startsWith(origin) && !r.url().startsWith('data:')) problems.push('foreign request: ' + r.url()); });
+  // CPU_THROTTLE=4 simulates a slow device/CI runner to flush out timing races.
+  if (process.env.CPU_THROTTLE) {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.CPU_THROTTLE) });
+  }
   await page.goto(url);
-  await page.locator('[data-test=balance]').waitFor({ timeout: 30000 });
+  await page.locator('[data-test=balance]').waitFor({ timeout: 60000 });
   // First visit in iPhone Safari (not installed): the "add to Home Screen" instructions are shown once.
   const hint = page.locator('[data-test="install-hint"]');
   const hadHint = await hint.count() > 0;
@@ -72,10 +77,17 @@ async function balance(page) { return (await page.locator(t('balance')).textCont
 async function tapN(page, n) { for (let i = 0; i < n; i++) await page.locator(t('tap')).click(); }
 async function tab(page, name) { await page.waitForTimeout(150); await closeCelebrations(page); await page.locator(t('nav-' + name)).click(); }
 // Celebration popups (new phase, crate reveal, daily gift) are part of the design: tests acknowledge them like a player.
+// Waits until no celebration popup is showing for two consecutive checks (robust on slow CI machines).
 async function closeCelebrations(page) {
-  for (const m of ['phase-modal', 'crate-modal', 'daily-modal', 'welcome-modal']) {
-    const loc = page.locator(t(m));
-    if (await loc.count()) await loc.locator('button').last().click();
+  let quiet = 0;
+  for (let i = 0; i < 20 && quiet < 2; i++) {
+    let found = false;
+    for (const m of ['phase-modal', 'crate-modal', 'daily-modal', 'welcome-modal']) {
+      const loc = page.locator(t(m));
+      if (await loc.count()) { await loc.locator('button').last().click(); found = true; }
+    }
+    quiet = found ? 0 : quiet + 1;
+    await page.waitForTimeout(150);
   }
 }
 async function dev(page, name) { await closeCelebrations(page); await page.locator(t(name)).click(); await page.waitForTimeout(400); await closeCelebrations(page); }
@@ -289,8 +301,20 @@ test('release: animated factory scene shows a drawing for every machine and reac
 test('release: fast tapping fills the frenzy meter and triggers the boost', async () => {
   const { context, page, problems } = await open(releaseUrl);
   const tap = page.locator(t('tap'));
-  for (let i = 0; i < 60 && !(await tap.getAttribute('class')).includes('frenzy'); i++) await tap.click({ delay: 0 });
-  await page.waitForFunction(() => document.querySelector('[data-test="tap"]').classList.contains('frenzy'));
+  // Finger taps at a steady ~10 per second (a person tapping fast), generated inside the page so the pace is exact
+  // even on a throttled CPU.
+  await page.evaluate(() => new Promise(resolve => {
+    const el = document.querySelector('[data-test="tap"]');
+    const r = el.getBoundingClientRect();
+    let n = 0;
+    const id = setInterval(() => {
+      const o = { bubbles: true, cancelable: true, pointerType: 'touch', isPrimary: true, button: 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+      el.dispatchEvent(new PointerEvent('pointerdown', o));
+      el.dispatchEvent(new PointerEvent('pointerup', o));
+      if (++n >= 45) { clearInterval(id); resolve(); }
+    }, 100);
+  }));
+  await page.waitForFunction(() => document.querySelector('[data-test="tap"]').classList.contains('frenzy'), null, { timeout: 30000 });
   assert.match(await tap.textContent(), /FRENESIA/);
   await shot(page, '08-frenesia');
   assert.deepEqual(problems, []);
@@ -346,7 +370,8 @@ test('release: animations stay smooth (no long main-thread stalls while tapping 
   await page.waitForTimeout(2000);
   const long = await page.evaluate(() => window.__long);
   const worst = long.length ? Math.max(...long) : 0;
-  assert.ok(worst < 250, 'longest main-thread task ' + worst + 'ms');
+  const limit = 250 * Number(process.env.CPU_THROTTLE || 1);     // budget scales with the simulated slowdown
+  assert.ok(worst < limit, 'longest main-thread task ' + worst + 'ms (limit ' + limit + 'ms)');
   await context.close();
 });
 

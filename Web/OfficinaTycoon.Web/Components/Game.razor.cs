@@ -284,8 +284,26 @@ namespace OfficinaTycoon.Web.Components
             DoTap(0, 0);
         }
 
+        // While the bench is hammered, re-rendering the whole UI on every single tap is wasted work on slow phones:
+        // taps are counted, and sound/particles fire, immediately; the screen catches up on the next ~10 Hz refresh.
+        bool _tapRenderSkip;
+        DateTime _lastRender = DateTime.MinValue;
+
+        protected override bool ShouldRender()
+        {
+            var now = DateTime.UtcNow;
+            if (_tapRenderSkip)
+            {
+                _tapRenderSkip = false;
+                if ((now - _lastRender).TotalMilliseconds < 90) return false;
+            }
+            _lastRender = now;
+            return true;
+        }
+
         void DoTap(double clientX, double clientY)
         {
+            _tapRenderSkip = true;
             double got = S.Production.Tap();
             Sfx("tap");
             _hit = !_hit;
@@ -542,7 +560,8 @@ namespace OfficinaTycoon.Web.Components
         }
 
         // ---- dev tools (only compiled with OfficinaDevTools=true and enabled by ?dev=1)
-        void DevMoney(double amount) { if (Host.DevMode) S.Wallet.Add(amount, "dev"); }
+        // Phase is re-evaluated immediately so the "new phase" celebration appears together with the money, not a tick later.
+        void DevMoney(double amount) { if (Host.DevMode) { S.Wallet.Add(amount, "dev"); S.Progression.Update(); } }
         void DevAway(double seconds)
         {
             if (!Host.DevMode) return;

@@ -60,6 +60,14 @@ jobs:
           mkdir -p "$SCREENSHOT_DIR"
           node --test --test-concurrency=1 game.e2e.cjs
 
+      - name: Browser end-to-end tests on a slow device (CPU 4x slower)
+        working-directory: Web/e2e
+        env:
+          RELEASE_DIR: ${{ github.workspace }}/out/release/wwwroot
+          DEV_DIR: ${{ github.workspace }}/out/dev/wwwroot
+          CPU_THROTTLE: '4'
+        run: node --test --test-concurrency=1 game.e2e.cjs
+
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
