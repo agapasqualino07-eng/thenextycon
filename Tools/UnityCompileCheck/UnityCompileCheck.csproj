@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    PARTIAL compile check of the Unity-facing scripts WITHOUT the Unity Editor.
+    Core UnityEngine APIs come from the community NuGet package UnityEngine.Modules (2021.3.33), which is close to
+    but NOT identical to Unity 6. UnityEngine.UI is not available on NuGet, so UiStubs.cs reproduces the small
+    subset of uGUI used by the project (written from API knowledge, so UI calls are only checked against the stubs).
+    A green build here is a smoke test, NOT a substitute for opening the project in Unity.
+    Run: dotnet build Tools/UnityCompileCheck
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/Scripts/Core/**/*.cs" />
+    <Compile Include="../../Assets/Scripts/Unity/**/*.cs" />
+    <Compile Include="UiStubs.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />
+  </ItemGroup>
+</Project>

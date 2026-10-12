@@ -1,0 +1,25 @@
+# Unity
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+*.csproj
+*.sln
+!Tools/**/*.csproj
+*.pidb.meta
+*.pdb.meta
+*.apk
+*.aab
+*.keystore
+*.jks
+# .NET tools
+Tools/**/bin/
+Tools/**/obj/
+TestResults/
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
