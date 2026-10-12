@@ -97,11 +97,7 @@ namespace OfficinaTycoon.UnityLayer
 
         void BuildCanvas()
         {
-            if (Compat.FindFirst<EventSystem>() == null)
-            {
-                var es = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
-                es.transform.SetParent(transform, false);
-            }
+            // The EventSystem is owned by GameBootstrap (it must survive UI rebuilds, e.g. after a progress reset).
             var go = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             go.transform.SetParent(transform, false);
             _canvas = go.GetComponent<Canvas>();

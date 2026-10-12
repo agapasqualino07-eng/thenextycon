@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace OfficinaTycoon.UnityLayer
 {
@@ -30,6 +31,7 @@ namespace OfficinaTycoon.UnityLayer
             Application.targetFrameRate = 60;
             Screen.orientation = ScreenOrientation.Portrait;
             EnsureCamera();
+            EnsureEventSystem();
             BeginSession();
         }
 
@@ -42,6 +44,13 @@ namespace OfficinaTycoon.UnityLayer
             cam.backgroundColor = UiKit.Bg;
             cam.orthographic = true;
             go.AddComponent<AudioListener>();
+        }
+
+        void EnsureEventSystem()
+        {
+            if (Compat.FindFirst<EventSystem>() != null) return;
+            var es = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+            es.transform.SetParent(transform, false);   // lives as long as the bootstrap, independent of UI rebuilds
         }
 
         void BeginSession()
