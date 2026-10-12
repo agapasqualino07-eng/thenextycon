@@ -9,6 +9,7 @@
 *.csproj
 *.sln
 !Tools/**/*.csproj
+!Web/**/*.csproj
 *.pidb.meta
 *.pdb.meta
 *.apk
